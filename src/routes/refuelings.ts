@@ -4,7 +4,8 @@ import {
   getAllRefuelings,
   getRefuelingById,
   updateRefueling,
-  deleteRefueling
+  deleteRefueling,
+  getCalendarRefuelings
 } from '../controllers/refuelingsController.js';
 
 const router = Router();
@@ -165,6 +166,48 @@ const router = Router();
  */
 router.post('/', createRefueling);
 router.get('/', getAllRefuelings);
+
+/**
+ * @openapi
+ * /api/refuelings/calendar:
+ *   get:
+ *     summary: Pobiera listę tankowań dla konkretnego roku, miesiąca lub tygodnia kalendarzowego
+ *     tags: [Refuelings]
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 2026
+ *         description: Rok (np. 2026, 2025)
+ *       - in: query
+ *         name: month
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: Numer miesiąca (1 - 12, np. 5 dla maja)
+ *       - in: query
+ *         name: week
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         example: 2
+ *         description: Numer tygodnia w danym miesiącu (1 - 5)
+ *     responses:
+ *       200:
+ *         description: Lista tankowań w wskazanym okresie kalendarzowym ze wskaźnikami
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Refueling'
+ *       400:
+ *         description: Nieprawidłowe parametry daty
+ */
+router.get('/calendar', getCalendarRefuelings);
 
 /**
  * @openapi

@@ -63,3 +63,19 @@ export interface StatsResponse {
   average_fuel_consumption: number | null;
   average_price_per_km: number | null;
 }
+
+export interface CalendarStatsResponse {
+  year: number;
+  month: number | null;
+  week: number | null;
+  description: string;
+  start_date: string;
+  end_date: string;
+  total_refuelings: number;
+  total_liters: number;
+  total_cost: number;
+  average_price_per_liter: number;
+  period_distance: number;
+  average_fuel_consumption: number | null;
+  average_price_per_km: number | null;
+}

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getDatabase } from '../db.js';
 import { Refueling, CreateRefuelingDTO, UpdateRefuelingDTO, RefuelingWithStats } from '../types/refueling.js';
 import { calculateRefuelingStats } from '../utils/calculations.js';
+import { getCalendarDateRange } from '../utils/calendarUtils.js';
 import { AppError } from '../middleware/errorHandler.js';
 
 export async function createRefueling(
@@ -266,3 +267,45 @@ export async function deleteRefueling(
     next(error);
   }
 }
+
+export async function getCalendarRefuelings(
+  req: Request<{}, {}, {}, { year?: string; month?: string; week?: string }>,
+  res: Response<RefuelingWithStats[]>,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { year, month, week } = req.query;
+    const dateRange = getCalendarDateRange(year, month, week);
+
+    const db = await getDatabase();
+
+    const allRefuelings = await db.all<Refueling[]>(
+      'SELECT * FROM refuelings ORDER BY date DESC, mileage DESC, id DESC'
+    );
+
+    const ascRefuelings = [...allRefuelings].reverse();
+    const withStatsMap = new Map<number, RefuelingWithStats>();
+
+    for (let i = 0; i < ascRefuelings.length; i++) {
+      const current = ascRefuelings[i];
+      const previous = i > 0 ? ascRefuelings[i - 1] : null;
+      const stats = calculateRefuelingStats(current, previous);
+      withStatsMap.set(current.id, { ...current, stats });
+    }
+
+    const startTime = dateRange.startDate.getTime();
+    const endTime = dateRange.endDate.getTime();
+
+    const filtered = allRefuelings.filter(r => {
+      const itemTime = new Date(r.date).getTime();
+      return !isNaN(itemTime) && itemTime >= startTime && itemTime <= endTime;
+    });
+
+    const result: RefuelingWithStats[] = filtered.map(r => withStatsMap.get(r.id)!);
+
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
