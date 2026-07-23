@@ -12,8 +12,8 @@ const router = Router();
  *       properties:
  *         period:
  *           type: string
- *           enum: [month, year, all]
- *           example: "month"
+ *           enum: [week, month, year, all]
+ *           example: "week"
  *         total_refuelings:
  *           type: integer
  *           description: Całkowita liczba tankowań w danym okresie
@@ -57,9 +57,9 @@ const router = Router();
  *         name: period
  *         schema:
  *           type: string
- *           enum: [month, year, all]
+ *           enum: [week, month, year, all]
  *           default: all
- *         description: Przedział czasowy (month - ostatni miesiąc, year - ostatni rok, all - od początku)
+ *         description: Przedział czasowy (week - ostatni tydzień, month - ostatni miesiąc, year - ostatni rok, all - od początku)
  *     responses:
  *       200:
  *         description: Obiekt ze statystykami zbiorczymi

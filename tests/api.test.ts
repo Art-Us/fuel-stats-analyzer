@@ -56,6 +56,12 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(res.body.error).toContain('Nieprawidłowy parametr period');
   });
 
+  it('GET /api/stats?period=week powinien zwrócić poprawne podsumowanie dla tygodnia', async () => {
+    const res = await request(app).get('/api/stats?period=week');
+    expect(res.status).toBe(200);
+    expect(res.body.period).toBe('week');
+  });
+
   it('GET /api/stats?period=all powinien zwrócić poprawne podsumowanie', async () => {
     const res = await request(app).get('/api/stats?period=all');
     expect(res.status).toBe(200);

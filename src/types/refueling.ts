@@ -50,7 +50,7 @@ export interface AnalyzePhotosResponse {
   dashboard_image_url: string | null;
 }
 
-export type StatsPeriod = 'month' | 'year' | 'all';
+export type StatsPeriod = 'week' | 'month' | 'year' | 'all';
 export type RefuelingPeriod = 'week' | 'month' | 'year' | 'all';
 
 export interface StatsResponse {

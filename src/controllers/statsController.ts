@@ -11,15 +11,17 @@ export async function getStatsController(
   try {
     const rawPeriod = (req.query.period || 'all').toLowerCase();
 
-    if (!['month', 'year', 'all'].includes(rawPeriod)) {
-      throw new AppError('Nieprawidłowy parametr period. Dozwolone wartości to: month, year, all.', 400);
+    if (!['week', 'month', 'year', 'all'].includes(rawPeriod)) {
+      throw new AppError('Nieprawidłowy parametr period. Dozwolone wartości to: week, month, year, all.', 400);
     }
 
     const period = rawPeriod as StatsPeriod;
     const db = await getDatabase();
 
     let whereClause = '';
-    if (period === 'month') {
+    if (period === 'week') {
+      whereClause = "WHERE date >= datetime('now', '-7 days')";
+    } else if (period === 'month') {
       whereClause = "WHERE date >= datetime('now', '-1 month')";
     } else if (period === 'year') {
       whereClause = "WHERE date >= datetime('now', '-1 year')";
