@@ -12,11 +12,101 @@ interface SeedRefueling {
 
 const sampleRefuelings: SeedRefueling[] = [
   {
-    date: '2026-06-25T10:00:00Z',
-    cost: 155.96,
-    liters: 27.17,
-    price_per_liter: 5.74,
-    mileage: 195439,
+    date: '2025-01-15T08:30:00Z',
+    cost: 199.26,
+    liters: 32.40,
+    price_per_liter: 6.15,
+    mileage: 188500,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-02-20T17:45:00Z',
+    cost: 263.50,
+    liters: 42.50,
+    price_per_liter: 6.20,
+    mileage: 189120,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-04-02T12:10:00Z',
+    cost: 270.67,
+    liters: 43.10,
+    price_per_liter: 6.28,
+    mileage: 189750,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-05-18T16:30:00Z',
+    cost: 287.02,
+    liters: 45.20,
+    price_per_liter: 6.35,
+    mileage: 190410,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-06-30T09:20:00Z',
+    cost: 308.80,
+    liters: 48.10,
+    price_per_liter: 6.42,
+    mileage: 191150,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-08-12T14:15:00Z',
+    cost: 309.74,
+    liters: 47.80,
+    price_per_liter: 6.48,
+    mileage: 191890,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-09-25T11:40:00Z',
+    cost: 282.44,
+    liters: 44.20,
+    price_per_liter: 6.39,
+    mileage: 192550,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-11-08T15:00:00Z',
+    cost: 287.11,
+    liters: 45.50,
+    price_per_liter: 6.31,
+    mileage: 193200,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2025-12-20T18:10:00Z',
+    cost: 280.00,
+    liters: 44.80,
+    price_per_liter: 6.25,
+    mileage: 193820,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2026-02-10T10:05:00Z',
+    cost: 272.54,
+    liters: 44.10,
+    price_per_liter: 6.18,
+    mileage: 194450,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  },
+  {
+    date: '2026-04-04T09:15:00Z',
+    cost: 170.84,
+    liters: 27.51,
+    price_per_liter: 6.21,
+    mileage: 194947,
     receipt_image_url: null,
     dashboard_image_url: null
   },
@@ -30,77 +120,23 @@ const sampleRefuelings: SeedRefueling[] = [
     dashboard_image_url: null
   },
   {
-    date: '2026-04-04T09:15:00Z',
-    cost: 170.84,
-    liters: 27.51,
-    price_per_liter: 6.21,
-    mileage: 194947,
+    date: '2026-06-25T10:00:00Z',
+    cost: 155.96,
+    liters: 27.17,
+    price_per_liter: 5.74,
+    mileage: 195439,
     receipt_image_url: null,
     dashboard_image_url: null
   },
-  // {
-  //   date: '2026-03-01T17:45:00Z',
-  //   cost: 275.00,
-  //   liters: 43.10,
-  //   price_per_liter: 6.38,
-  //   mileage: 121980,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // },
-  // {
-  //   date: '2026-04-02T11:20:00Z',
-  //   cost: 265.00,
-  //   liters: 41.41,
-  //   price_per_liter: 6.40,
-  //   mileage: 122600,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // },
-  // {
-  //   date: '2026-05-03T16:10:00Z',
-  //   cost: 290.00,
-  //   liters: 44.82,
-  //   price_per_liter: 6.47,
-  //   mileage: 123300,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // },
-  // {
-  //   date: '2026-06-05T08:50:00Z',
-  //   cost: 270.00,
-  //   liters: 41.54,
-  //   price_per_liter: 6.50,
-  //   mileage: 123950,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // },
-  // {
-  //   date: '2026-06-25T13:00:00Z',
-  //   cost: 285.00,
-  //   liters: 43.64,
-  //   price_per_liter: 6.53,
-  //   mileage: 124620,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // },
-  // {
-  //   date: '2026-07-10T15:20:00Z',
-  //   cost: 278.00,
-  //   liters: 42.44,
-  //   price_per_liter: 6.55,
-  //   mileage: 125280,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // },
-  // {
-  //   date: '2026-07-22T18:40:00Z',
-  //   cost: 260.00,
-  //   liters: 39.51,
-  //   price_per_liter: 6.58,
-  //   mileage: 125900,
-  //   receipt_image_url: null,
-  //   dashboard_image_url: null
-  // }
+  {
+    date: '2026-07-18T16:45:00Z',
+    cost: 137.97,
+    liters: 23.87,
+    price_per_liter: 5.78,
+    mileage: 195780,
+    receipt_image_url: null,
+    dashboard_image_url: null
+  }
 ];
 
 async function seed() {
@@ -108,10 +144,10 @@ async function seed() {
     console.log('Inicjalizacja połączenia z bazą danych...');
     const db = await getDatabase();
 
-    console.log('Czyszczenie istniejących rekordów w tabeli refuelings (opcjonalnie)...');
-    // await db.run('DELETE FROM refuelings');
+    console.log('Czyszczenie istniejących rekordów w tabeli refuelings...');
+    await db.run('DELETE FROM refuelings');
 
-    console.log('Wstawianie 10 przykładowych rekordów tankowania...');
+    console.log(`Wstawianie ${sampleRefuelings.length} realistycznych rekordów tankowania...`);
     for (const item of sampleRefuelings) {
       await db.run(
         `INSERT INTO refuelings (date, cost, liters, price_per_liter, mileage, receipt_image_url, dashboard_image_url, created_at)
