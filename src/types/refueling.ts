@@ -49,3 +49,16 @@ export interface AnalyzePhotosResponse {
   receipt_image_url: string | null;
   dashboard_image_url: string | null;
 }
+
+export type StatsPeriod = 'month' | 'year' | 'all';
+
+export interface StatsResponse {
+  period: StatsPeriod;
+  total_refuelings: number;
+  total_liters: number;
+  total_cost: number;
+  average_price_per_liter: number;
+  period_distance: number;
+  average_fuel_consumption: number | null;
+  average_price_per_km: number | null;
+}
