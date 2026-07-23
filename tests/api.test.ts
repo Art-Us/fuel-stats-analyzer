@@ -44,6 +44,24 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(res.body.stats).toBeDefined();
   });
 
+  it('GET /api/refuelings?period=month powinien zwrócić przefiltrowaną listę', async () => {
+    const res = await request(app).get('/api/refuelings?period=month');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('GET /api/refuelings z błędnym parametrem period powinien zwrócić błąd 400', async () => {
+    const res = await request(app).get('/api/refuelings?period=invalid_period');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Nieprawidłowy parametr period');
+  });
+
+  it('GET /api/stats?period=week powinien zwrócić poprawne podsumowanie dla tygodnia', async () => {
+    const res = await request(app).get('/api/stats?period=week');
+    expect(res.status).toBe(200);
+    expect(res.body.period).toBe('week');
+  });
+
   it('GET /api/stats?period=all powinien zwrócić poprawne podsumowanie', async () => {
     const res = await request(app).get('/api/stats?period=all');
     expect(res.status).toBe(200);
@@ -51,6 +69,45 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(res.body.total_refuelings).toBeGreaterThan(0);
     expect(res.body.total_cost).toBeGreaterThan(0);
     expect(res.body.total_liters).toBeGreaterThan(0);
+  });
+
+  it('GET /api/refuelings/calendar?year=2026&month=7 powinien zwrócić tankowania z lipca 2026', async () => {
+    const res = await request(app).get('/api/refuelings/calendar?year=2026&month=7');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('GET /api/stats/calendar?year=2026&month=7 powinien zwrócić statystyki z lipca 2026', async () => {
+    const res = await request(app).get('/api/stats/calendar?year=2026&month=7');
+    expect(res.status).toBe(200);
+    expect(res.body.year).toBe(2026);
+    expect(res.body.month).toBe(7);
+    expect(res.body.description).toBeDefined();
+  });
+
+  it('GET /api/stats/calendar?year=2021&month=5&week=1 powinien obsłużyć 1. tydzień maja 2021', async () => {
+    const res = await request(app).get('/api/stats/calendar?year=2021&month=5&week=1');
+    expect(res.status).toBe(200);
+    expect(res.body.year).toBe(2021);
+    expect(res.body.month).toBe(5);
+    expect(res.body.week).toBe(1);
+    expect(res.body.description).toContain('Tydzień 1 miesiąca 5/2021');
+  });
+
+  it('GET /api/stats/calendar?year=2022&month=1 powinien obsłużyć cały styczeń 2022', async () => {
+    const res = await request(app).get('/api/stats/calendar?year=2022&month=1');
+    expect(res.status).toBe(200);
+    expect(res.body.year).toBe(2022);
+    expect(res.body.month).toBe(1);
+    expect(res.body.description).toContain('Miesiąc 1/2022');
+  });
+
+  it('GET /api/stats/calendar?year=2024 powinien obsłużyć cały rok 2024', async () => {
+    const res = await request(app).get('/api/stats/calendar?year=2024');
+    expect(res.status).toBe(200);
+    expect(res.body.year).toBe(2024);
+    expect(res.body.month).toBeNull();
+    expect(res.body.description).toContain('Rok 2024');
   });
 
   it('GET /api/stats z nieprawidłowym okresem powinien zwrócić błąd 400', async () => {
