@@ -505,22 +505,8 @@ export const EditRefuelingView: React.FC = () => {
 
           <button
             type="button"
+            className="btn-danger-outline"
             onClick={() => setShowDeleteConfirm(true)}
-            style={{
-              width: '100%',
-              padding: '14px',
-              backgroundColor: '#fef2f2',
-              color: '#dc2626',
-              border: '1px solid #fecaca',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '1rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
             disabled={isDeleting || isSubmitting}
           >
             <Trash2 size={20} /> Usuń tankowanie z bazy
