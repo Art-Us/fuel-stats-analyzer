@@ -54,8 +54,8 @@ describe('calculateRefuelingStats', () => {
     expect(stats.distance).toBe(500);
     // (40 litrów / 500 km) * 100 = 8.0 l/100km
     expect(stats.fuel_consumption_l_per_100km).toBe(8.0);
-    // 260 PLN / 500 km = 0.52 PLN/km
-    expect(stats.cost_per_km).toBe(0.52);
+    // (40 litrów * 6.67 PLN/l z poprzedniego tankowania) / 500 km = 0.5336 -> 0.53 PLN/km
+    expect(stats.cost_per_km).toBe(0.53);
   });
 
   it('powinien obsłużyć ujemny lub zerowy dystans', () => {

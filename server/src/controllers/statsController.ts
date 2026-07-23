@@ -73,16 +73,31 @@ export async function getStatsController(
       [oldestRefueling.date, oldestRefueling.date, oldestRefueling.id]
     );
 
-    const startMileage = priorRefueling ? priorRefueling.mileage : oldestRefueling.mileage;
+    let startMileage: number;
+    let litersForConsumption: number;
+    let costForKm: number;
+
+    if (priorRefueling) {
+      startMileage = priorRefueling.mileage;
+      litersForConsumption = total_liters;
+      costForKm = total_cost;
+    } else {
+      startMileage = oldestRefueling.mileage;
+      // Jeśli brak wpisu poprzedniego (np. okres 'od początku'), pierwsze tankowanie służy jako punkt startowy przebiegu.
+      // Paliwo i koszt z tego pierwszego tankowania zostały zakupione wcześniej i nie wchodzą w zużycie na dystansie przejechanym PO tym tankowaniu.
+      litersForConsumption = total_liters - oldestRefueling.liters;
+      costForKm = total_cost - oldestRefueling.cost;
+    }
+
     const rawDistance = latestRefueling.mileage - startMileage;
     const period_distance = rawDistance > 0 ? Number(rawDistance.toFixed(2)) : 0;
 
     let average_fuel_consumption: number | null = null;
     let average_price_per_km: number | null = null;
 
-    if (period_distance > 0) {
-      average_fuel_consumption = Number(((total_liters / period_distance) * 100).toFixed(2));
-      average_price_per_km = Number((total_cost / period_distance).toFixed(2));
+    if (period_distance > 0 && litersForConsumption > 0) {
+      average_fuel_consumption = Number(((litersForConsumption / period_distance) * 100).toFixed(2));
+      average_price_per_km = Number((costForKm / period_distance).toFixed(2));
     }
 
     res.status(200).json({
@@ -164,16 +179,29 @@ export async function getCalendarStatsController(
       [oldestRefueling.date, oldestRefueling.date, oldestRefueling.id]
     );
 
-    const startMileage = priorRefueling ? priorRefueling.mileage : oldestRefueling.mileage;
+    let startMileage: number;
+    let litersForConsumption: number;
+    let costForKm: number;
+
+    if (priorRefueling) {
+      startMileage = priorRefueling.mileage;
+      litersForConsumption = total_liters;
+      costForKm = total_cost;
+    } else {
+      startMileage = oldestRefueling.mileage;
+      litersForConsumption = total_liters - oldestRefueling.liters;
+      costForKm = total_cost - oldestRefueling.cost;
+    }
+
     const rawDistance = latestRefueling.mileage - startMileage;
     const period_distance = rawDistance > 0 ? Number(rawDistance.toFixed(2)) : 0;
 
     let average_fuel_consumption: number | null = null;
     let average_price_per_km: number | null = null;
 
-    if (period_distance > 0) {
-      average_fuel_consumption = Number(((total_liters / period_distance) * 100).toFixed(2));
-      average_price_per_km = Number((total_cost / period_distance).toFixed(2));
+    if (period_distance > 0 && litersForConsumption > 0) {
+      average_fuel_consumption = Number(((litersForConsumption / period_distance) * 100).toFixed(2));
+      average_price_per_km = Number((costForKm / period_distance).toFixed(2));
     }
 
     res.status(200).json({

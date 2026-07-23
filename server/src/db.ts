@@ -34,5 +34,12 @@ async function initDatabase(db: Database): Promise<void> {
       dashboard_image_url TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    INSERT OR IGNORE INTO settings (key, value) VALUES ('car_name', 'Mój Samochód');
   `);
 }
