@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Fuel, Menu, Settings, Save, AlertCircle } from 'lucide-react';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon } from 'lucide-react';
 import { getCarInfo, updateCarInfo } from '../services/api';
 
 interface HeaderProps {
@@ -13,6 +13,26 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
 
   const [carName, setCarName] = useState<string>('Mój Samochód');
   const [latestMileage, setLatestMileage] = useState<number | null>(null);
+
+  // Theme State (Dark / Light Mode)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Settings Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -87,12 +107,15 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
   return (
     <header className="app-header">
       <div className="header-top">
-        <div className="header-title-container">
-          <button className="header-icon-btn" aria-label="Menu">
-            <Menu size={22} />
-          </button>
-          <h1 className="header-title">{title}</h1>
-        </div>
+        <h1 className="header-title">{title}</h1>
+        <button
+          className="header-icon-btn"
+          aria-label="Przełącz motyw (ciemny/jasny)"
+          title={theme === 'dark' ? 'Przełącz na tryb jasny' : 'Przełącz na tryb ciemny'}
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? <Sun size={22} color="#f59e0b" /> : <Moon size={22} />}
+        </button>
       </div>
 
       <div className="vehicle-card">

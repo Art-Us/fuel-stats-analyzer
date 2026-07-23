@@ -20,6 +20,29 @@
   --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+body.dark-mode {
+  --bg-app: #0b1120;
+  --bg-card: #151e32;
+  --bg-card-secondary: #0f172a;
+  --primary: #2563eb;
+  --primary-light: rgba(37, 99, 235, 0.18);
+  --primary-hover: #1d4ed8;
+  --accent: #3b82f6;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+  --border-color: #232f48;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Unified Theme Transition for all elements */
+*, *::before, *::after {
+  transition-property: background-color, color, border-color, box-shadow, fill, stroke;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -205,7 +228,7 @@ body {
   font-weight: 600;
   padding: 6px 16px;
   border-radius: 20px;
-  transition: all 0.25s ease;
+  transition: transform 0.2s ease, background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-item.active {
@@ -218,7 +241,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-item.active .nav-icon-wrapper {
@@ -243,7 +266,7 @@ body {
   border: none;
   cursor: pointer;
   z-index: 45;
-  transition: transform 0.2s, background 0.2s;
+  transition: transform 0.2s ease, background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (max-width: 480px) {
@@ -280,7 +303,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .clickable-card {
@@ -578,7 +601,8 @@ body {
 /* Stats View Styles (`StatsView`) */
 .period-tabs {
   display: flex;
-  background: #e2e8f0;
+  background: var(--bg-card-secondary);
+  border: 1px solid var(--border-color);
   padding: 4px;
   border-radius: var(--radius-md);
   margin-bottom: 20px;
@@ -604,9 +628,10 @@ body {
 }
 
 /* Swiper Card Styling */
-.stats-swiper {
+.stats-swiper,
+.charts-swiper {
   width: 100%;
-  padding-bottom: 24px !important;
+  padding-bottom: 28px !important;
 }
 
 .swiper-pagination-bullet-active {
@@ -670,18 +695,94 @@ body {
 .chart-card {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 18px 16px;
   box-shadow: var(--shadow-sm);
   border: 1px solid rgba(226, 232, 240, 0.7);
   margin-top: 16px;
 }
 
+body.dark-mode .chart-card {
+  border-color: var(--border-color);
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.chart-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card-secondary);
+}
+
 .chart-title {
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-main);
-  margin-bottom: 12px;
+  line-height: 1.2;
 }
+
+.chart-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.chart-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--bg-card-secondary);
+  color: var(--primary);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+}
+
+.chart-category-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.chart-category-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-category-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
 
 /* Modal Photo Source & Settings Sheet */
 .modal-overlay {
@@ -778,4 +879,172 @@ body {
 
 .btn-modal-cancel:hover {
   color: var(--text-main);
+}
+
+/* Dark Mode Component Overrides */
+body.dark-mode .card-delta {
+  color: #4ade80;
+  background-color: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+body.dark-mode .card-divider {
+  background-color: var(--border-color);
+}
+
+body.dark-mode .card-stats-row {
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+body.dark-mode .kpi-sub-grid {
+  background: #0f172a;
+}
+
+.btn-danger-outline {
+  width: 100%;
+  padding: 14px;
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-danger-outline:hover {
+  background-color: #fee2e2;
+}
+
+body.dark-mode .btn-primary {
+  background-color: #1d3557;
+  color: #f1f5f9;
+  border: 1px solid #2563eb;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .btn-primary:hover {
+  background-color: #2563eb;
+}
+
+body.dark-mode .btn-danger-outline {
+  background-color: rgba(220, 38, 38, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+}
+
+body.dark-mode .btn-danger-outline:hover {
+  background-color: rgba(220, 38, 38, 0.25);
+  border-color: rgba(220, 38, 38, 0.5);
+}
+
+body.dark-mode .btn-secondary {
+  background: #151e32;
+  color: #cbd5e1;
+  border: 1px solid var(--border-color);
+}
+
+body.dark-mode .btn-secondary:hover {
+  background: #1e293b;
+}
+
+body.dark-mode .fab-btn {
+  background-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+body.dark-mode .photo-upload-btn {
+  background: #151e32;
+  border-color: var(--border-color);
+  color: #f1f5f9;
+}
+
+body.dark-mode .photo-upload-btn-secondary {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+body.dark-mode .btn-modal-option {
+  background: #0f172a;
+  border-color: var(--border-color);
+  color: #f1f5f9;
+}
+
+body.dark-mode .btn-modal-option:hover {
+  background: #151e32;
+  border-color: #3b82f6;
+}
+
+body.dark-mode .ai-loading-banner {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+  color: #93c5fd;
+}
+
+body.dark-mode .clickable-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .bottom-nav {
+  background: rgba(15, 23, 42, 0.95);
+  border-top-color: var(--border-color);
+}
+
+body.dark-mode .nav-item.active {
+  color: #60a5fa;
+}
+
+body.dark-mode .nav-item.active .nav-icon-wrapper {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+body.dark-mode .filter-chip {
+  background: #151e32;
+  color: #94a3b8;
+  border: 1px solid var(--border-color);
+}
+
+body.dark-mode .filter-chip.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+body.dark-mode .period-tabs {
+  background: #0f172a;
+  border-color: var(--border-color);
+}
+
+body.dark-mode .tab-btn {
+  color: #94a3b8;
+}
+
+body.dark-mode .tab-btn.active {
+  background: #151e32;
+  color: #60a5fa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Theme Icon Animation */
+.header-icon-btn svg {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.header-icon-btn:hover svg {
+  transform: rotate(20deg) scale(1.1);
+}
+
+.header-icon-btn:active svg {
+  transform: rotate(90deg) scale(0.85);
 }
