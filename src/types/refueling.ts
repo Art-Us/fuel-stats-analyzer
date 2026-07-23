@@ -1,6 +1,6 @@
 export interface Refueling {
   id: number;
-  date: string; // ISO String format e.g., "2026-07-23T08:30:00Z"
+  date: string; // Format ISO, np. "2026-07-23T08:30:00Z"
   cost: number;
   liters: number;
   price_per_liter: number;
@@ -38,4 +38,14 @@ export interface UpdateRefuelingDTO {
   mileage?: number;
   receipt_image_url?: string | null;
   dashboard_image_url?: string | null;
+}
+
+export interface AnalyzePhotosResponse {
+  date: string | null;
+  cost: number;
+  liters: number;
+  price_per_liter: number;
+  mileage: number;
+  receipt_image_url: string | null;
+  dashboard_image_url: string | null;
 }
