@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import refuelingsRouter from './routes/refuelings.js';
 import analysisRouter from './routes/analysis.js';
+import statsRouter from './routes/stats.js';
 import { setupSwagger } from './swagger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getDatabase } from './db.js';
@@ -33,6 +34,7 @@ setupSwagger(app);
 // Rejestracja endpointów API
 app.use('/api/refuelings', refuelingsRouter);
 app.use('/api/analyze-photos', analysisRouter);
+app.use('/api/stats', statsRouter);
 
 // Główna trasa informacyjna
 app.get('/', (_req, res) => {
