@@ -51,6 +51,7 @@ export interface AnalyzePhotosResponse {
 }
 
 export type StatsPeriod = 'month' | 'year' | 'all';
+export type RefuelingPeriod = 'week' | 'month' | 'year' | 'all';
 
 export interface StatsResponse {
   period: StatsPeriod;

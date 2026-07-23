@@ -44,6 +44,18 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(res.body.stats).toBeDefined();
   });
 
+  it('GET /api/refuelings?period=month powinien zwrócić przefiltrowaną listę', async () => {
+    const res = await request(app).get('/api/refuelings?period=month');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('GET /api/refuelings z błędnym parametrem period powinien zwrócić błąd 400', async () => {
+    const res = await request(app).get('/api/refuelings?period=invalid_period');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Nieprawidłowy parametr period');
+  });
+
   it('GET /api/stats?period=all powinien zwrócić poprawne podsumowanie', async () => {
     const res = await request(app).get('/api/stats?period=all');
     expect(res.status).toBe(200);

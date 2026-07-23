@@ -75,11 +75,17 @@ export async function createRefueling(
 }
 
 export async function getAllRefuelings(
-  _req: Request,
+  req: Request<{}, {}, {}, { period?: string }>,
   res: Response<RefuelingWithStats[]>,
   next: NextFunction
 ): Promise<void> {
   try {
+    const rawPeriod = (req.query.period || 'all').toLowerCase();
+
+    if (!['week', 'month', 'year', 'all'].includes(rawPeriod)) {
+      throw new AppError('Nieprawidłowy parametr period. Dozwolone wartości to: week, month, year, all.', 400);
+    }
+
     const db = await getDatabase();
 
     // Pobieramy wszystkie tankowania posortowane po dacie malejąco (ORDER BY date DESC)
@@ -87,7 +93,7 @@ export async function getAllRefuelings(
       'SELECT * FROM refuelings ORDER BY date DESC, mileage DESC, id DESC'
     );
 
-    // Aby prawidłowo powiązać wpisy z ich historycznymi poprzednikami, tymczasowo odwracamy kolejność na chronologiczną (ASC)
+    // Aby prawidłowo powiązać wpisy z ich historycznymi poprzednikami, odwracamy kolejność na chronologiczną (ASC)
     const ascRefuelings = [...allRefuelings].reverse();
 
     const withStatsMap = new Map<number, RefuelingWithStats>();
@@ -98,8 +104,28 @@ export async function getAllRefuelings(
       withStatsMap.set(current.id, { ...current, stats });
     }
 
-    // Zwracamy w wymaganej kolejności DESC
-    const result: RefuelingWithStats[] = allRefuelings.map(r => withStatsMap.get(r.id)!);
+    let result: RefuelingWithStats[] = allRefuelings.map(r => withStatsMap.get(r.id)!);
+
+    // Filtrowanie według wybranego okresu czasu
+    if (rawPeriod !== 'all') {
+      const now = Date.now();
+      let msThreshold = 0;
+
+      if (rawPeriod === 'week') {
+        msThreshold = 7 * 24 * 60 * 60 * 1000;
+      } else if (rawPeriod === 'month') {
+        msThreshold = 30 * 24 * 60 * 60 * 1000;
+      } else if (rawPeriod === 'year') {
+        msThreshold = 365 * 24 * 60 * 60 * 1000;
+      }
+
+      const thresholdTime = now - msThreshold;
+
+      result = result.filter(r => {
+        const itemTime = new Date(r.date).getTime();
+        return !isNaN(itemTime) && itemTime >= thresholdTime;
+      });
+    }
 
     res.status(200).json(result);
   } catch (error) {

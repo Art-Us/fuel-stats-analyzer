@@ -143,11 +143,19 @@ const router = Router();
  *       400:
  *         description: Błąd walidacji danych wejściowych
  *   get:
- *     summary: Pobiera historię tankowań posortowaną po dacie malejąco
+ *     summary: Pobiera historię tankowań posortowaną po dacie malejąco (z opcjonalnym filtrowaniem po okresie)
  *     tags: [Refuelings]
+ *     parameters:
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *           enum: [week, month, year, all]
+ *           default: all
+ *         description: Filtruje wpisy tankowań za wyznaczony okres czasu (week, month, year, all)
  *     responses:
  *       200:
- *         description: Lista wszystkich tankowań z wyliczonymi wskaźnikami (dystans, l/100km, koszt/km)
+ *         description: Lista tankowań z wyliczonymi wskaźnikami (dystans, l/100km, koszt/km)
  *         content:
  *           application/json:
  *             schema:
