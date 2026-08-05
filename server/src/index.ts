@@ -55,8 +55,8 @@ async function bootstrap() {
     await getDatabase();
     console.log('Baza danych SQLite została pomyślnie zainicjalizowana.');
 
-    app.listen(PORT, () => {
-      console.log(`Serwer działa na porcie ${PORT}`);
+    app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`Serwer działa na porcie ${PORT} (0.0.0.0)`);
       console.log(`Dokumentacja Swagger UI dostępna pod adresem: http://localhost:${PORT}/api-docs`);
     });
   } catch (error) {

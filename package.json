@@ -3,13 +3,11 @@
   "version": "1.0.0",
   "description": "Fuel Tracker Application (Monorepo with Client & Server)",
   "private": true,
-  "workspaces": [
-    "client",
-    "server"
-  ],
+
   "scripts": {
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
+    "dev:mobile": "npm --prefix mobile start",
     "build:client": "npm --prefix client run build",
     "build:server": "npm --prefix server run build",
     "seed": "npm --prefix server run seed",
