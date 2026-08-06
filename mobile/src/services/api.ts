@@ -72,12 +72,40 @@ export const analyzePhotos = async (
     } as any);
   }
 
-  const response = await api.post<AnalyzeResponse>('/analyze-photos', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-  return response.data;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+  console.log(`[MOBILE LOG] 🚀 Wysyłam zdjęcia do: ${API_BASE_URL}/analyze-photos`);
+  if (receiptImage) console.log(`[MOBILE LOG] Paragon URI: ${receiptImage.uri}`);
+  if (dashboardImage) console.log(`[MOBILE LOG] Licznik URI: ${dashboardImage.uri}`);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze-photos`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    console.log(`[MOBILE LOG] 📥 Odpowiedź serwera Status: ${response.status}`);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[MOBILE LOG] ❌ Błąd HTTP ${response.status}:`, errText);
+      throw new Error(`Błąd serwera (${response.status}): ${errText || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[MOBILE LOG] ✅ Pomyślnie odebrano dane z AI:`, JSON.stringify(data));
+    return data;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    console.error(`[MOBILE LOG] ❌ Wyjątek podczas wysyłania/analizy:`, err);
+    if (err.name === 'AbortError') {
+      throw new Error('Przekroczono czas oczekiwania na analizę Tesseract + AI (Timeout 90s).');
+    }
+    throw err;
+  }
 };
 
 export const getStats = async (period: PeriodType = 'all'): Promise<StatsResponse> => {

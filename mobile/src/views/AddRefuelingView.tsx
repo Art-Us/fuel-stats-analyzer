@@ -114,8 +114,12 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
       const result = await analyzePhotos(rFile, dFile);
 
       if (result.date) {
-        const formattedDate = new Date(result.date).toISOString().split('T')[0];
-        setDate(formattedDate);
+        try {
+          const parsedD = new Date(result.date);
+          if (!isNaN(parsedD.getTime())) {
+            setDate(parsedD.toISOString().split('T')[0]);
+          }
+        } catch (_) {}
       }
       if (result.cost != null) {
         setCost(result.cost.toString());
@@ -139,9 +143,9 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
       }
 
       setAiSuccessMsg('Dane ze zdjęć zostały automatycznie odczytane przez AI!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Błąd podczas analizy AI:', err);
-      setErrorMsg('Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
+      setErrorMsg(`Nie udało się przeanalizować zdjęć (${err?.message || 'Błąd połączenia'}). Uzupełnij dane ręcznie.`);
     } finally {
       setIsAnalyzing(false);
     }
