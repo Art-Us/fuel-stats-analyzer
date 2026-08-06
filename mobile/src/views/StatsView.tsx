@@ -33,6 +33,7 @@ import { useScroll } from '../context/ScrollContext';
 import { useViewControl } from '../context/ViewControlContext';
 import { getStats, getRefuelings } from '../services/api';
 import { StatsResponse, PeriodType, Refueling } from '../types/api';
+import { VehicleCard } from '../components/Header';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -45,6 +46,10 @@ interface AreaChartItemProps {
   gradientId: string;
   unit: string;
   colors: any;
+}
+
+interface StatsViewProps {
+  carRefreshTrigger?: number;
 }
 
 const AreaChartItem: React.FC<AreaChartItemProps> = ({
@@ -262,7 +267,7 @@ const AreaChartItem: React.FC<AreaChartItemProps> = ({
   );
 };
 
-export const StatsView: React.FC = () => {
+export const StatsView: React.FC<StatsViewProps> = ({ carRefreshTrigger = 0 }) => {
   const { colors } = useTheme();
   const {
     getScrollY,
@@ -339,6 +344,7 @@ export const StatsView: React.FC = () => {
         onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'stats')}
         scrollEventThrottle={16}
       >
+        <VehicleCard refreshTrigger={carRefreshTrigger} />
         <Text style={[styles.title, { color: colors.textMain }]}>Statystyki i Analiza</Text>
 
         {/* Period Tabs */}

@@ -29,27 +29,25 @@ export const CircularThemeOverlay: React.FC<CircularThemeOverlayProps> = ({
   const nextColors = nextTheme === 'dark' ? darkColors : lightColors;
 
   useEffect(() => {
-    // 1. Expand circle filled with new background color over 750ms
+    // 1. Expand GPU-accelerated circle filled with new background color over 400ms (60 FPS native driver)
     Animated.timing(scaleAnim, {
       toValue: 1,
-      duration: 750,
-      easing: Easing.out(Easing.cubic),
+      duration: 400,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start(() => {
-      // 2. Circle covers 100% of the screen. Trigger theme elements update now!
+      // 2. Circle covers the screen. Update main theme state now
       onBackgroundCovered();
 
-      // 3. Smoothly fade out overlay to reveal updated UI elements
-      setTimeout(() => {
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }).start(() => {
-          onComplete();
-        });
-      }, 40);
+      // 3. Fast fade out overlay to reveal newly themed UI components
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 120,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(() => {
+        onComplete();
+      });
     });
   }, []);
 

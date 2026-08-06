@@ -54,7 +54,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       switchThemeFunction: performThemeChange,
       animationConfig: {
         type: 'circular',
-        duration: 900,
+        duration: 500,
         startingPoint: { cx, cy },
       },
     });

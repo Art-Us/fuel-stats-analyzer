@@ -31,12 +31,14 @@ import { useScroll } from '../context/ScrollContext';
 import { analyzePhotos, createRefueling, MobileImageFile } from '../services/api';
 
 import { DatePickerModal } from '../components/DatePickerModal';
+import { VehicleCard } from '../components/Header';
 
 interface AddRefuelingViewProps {
   onSuccess: () => void;
+  carRefreshTrigger?: number;
 }
 
-export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess }) => {
+export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, carRefreshTrigger = 0 }) => {
   const { colors } = useTheme();
   const { getScrollY, setScrollY } = useScroll();
 
@@ -242,6 +244,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess })
         onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'add')}
         scrollEventThrottle={16}
       >
+        <VehicleCard refreshTrigger={carRefreshTrigger} />
         <Text style={[styles.title, { color: colors.textMain }]}>Dodaj nowe tankowanie</Text>
 
         {/* Photo Buttons Grid */}

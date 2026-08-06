@@ -8,7 +8,7 @@ interface CircularThemeMaskProps {
   children: React.ReactNode;
 }
 
-export const CircularThemeMask: React.FC<CircularThemeMaskProps> = ({
+export const CircularThemeMask = React.memo<CircularThemeMaskProps>(({
   cx,
   cy,
   onComplete,
@@ -24,7 +24,7 @@ export const CircularThemeMask: React.FC<CircularThemeMaskProps> = ({
   useEffect(() => {
     Animated.timing(anim, {
       toValue: 1,
-      duration: 800,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start(() => {
@@ -94,7 +94,7 @@ export const CircularThemeMask: React.FC<CircularThemeMaskProps> = ({
       </Animated.View>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   overlayContainer: {

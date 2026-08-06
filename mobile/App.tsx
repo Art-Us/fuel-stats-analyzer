@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { ScrollProvider } from './src/context/ScrollContext';
 import { ViewControlProvider } from './src/context/ViewControlContext';
-import { Header } from './src/components/Header';
+import { TopNavBar } from './src/components/Header';
 import { BottomNav, TabType } from './src/components/BottomNav';
 import { HistoryView } from './src/views/HistoryView';
 import { AddRefuelingView } from './src/views/AddRefuelingView';
@@ -42,8 +42,8 @@ const AppContent: React.FC<AppContentProps> = ({
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bgApp }]}>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <Header refreshTrigger={carRefreshTrigger} />
+      {/* Top Navbar fixed */}
+      <TopNavBar title="Statystyki Paliwa" />
 
       {/* Body Views */}
       <View style={styles.body}>
@@ -57,11 +57,12 @@ const AppContent: React.FC<AppContentProps> = ({
           <HistoryView
             onNavigateAdd={onNavigateAdd}
             onNavigateEdit={onNavigateEdit}
+            carRefreshTrigger={carRefreshTrigger}
           />
         ) : currentTab === 'add' ? (
-          <AddRefuelingView onSuccess={onAddSuccess} />
+          <AddRefuelingView onSuccess={onAddSuccess} carRefreshTrigger={carRefreshTrigger} />
         ) : (
-          <StatsView />
+          <StatsView carRefreshTrigger={carRefreshTrigger} />
         )}
       </View>
 

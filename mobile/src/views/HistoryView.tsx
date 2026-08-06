@@ -15,17 +15,20 @@ import { useViewControl } from '../context/ViewControlContext';
 import { getRefuelings } from '../services/api';
 import { Refueling } from '../types/api';
 import { RefuelingCard } from '../components/RefuelingCard';
+import { VehicleCard } from '../components/Header';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface HistoryViewProps {
   onNavigateAdd: () => void;
   onNavigateEdit: (id: number) => void;
+  carRefreshTrigger?: number;
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
   onNavigateAdd,
   onNavigateEdit,
+  carRefreshTrigger = 0,
 }) => {
   const { colors } = useTheme();
   const { getScrollY, setScrollY } = useScroll();
@@ -92,6 +95,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           />
         }
       >
+        <VehicleCard refreshTrigger={carRefreshTrigger} />
         {loading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={colors.primary} />
