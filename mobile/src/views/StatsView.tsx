@@ -37,7 +37,7 @@ import { StatsResponse, PeriodType, Refueling } from '../types/api';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CHART_HEIGHT = 205;
+const CHART_HEIGHT = 190;
 
 interface AreaChartItemProps {
   data: { label: string; fullDate?: string; value: number | null }[];
@@ -694,20 +694,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 80,
+    paddingTop: 14,
+    paddingBottom: 88,
   },
   title: {
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   periodTabs: {
     flexDirection: 'row',
     borderWidth: 1,
     padding: 4,
     borderRadius: 14,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   tabBtn: {
     flex: 1,
@@ -715,8 +715,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
+    overflow: 'hidden',
   },
   tabActive: {
+    borderRadius: 10,
+    overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -754,7 +757,7 @@ const styles = StyleSheet.create({
   },
   swiper: {
     marginHorizontal: -20,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   swiperContainer: {
     paddingHorizontal: 20,
@@ -762,9 +765,9 @@ const styles = StyleSheet.create({
   kpiCard: {
     width: CARD_WIDTH,
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
-    gap: 16,
+    gap: 12,
     marginRight: CARD_GAP,
   },
   kpiHeader: {

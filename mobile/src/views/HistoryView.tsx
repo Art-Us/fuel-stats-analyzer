@@ -79,6 +79,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     <View style={[styles.container, { backgroundColor: colors.bgApp }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         contentOffset={{ x: 0, y: getScrollY('history') }}
         onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'history')}
         scrollEventThrottle={16}

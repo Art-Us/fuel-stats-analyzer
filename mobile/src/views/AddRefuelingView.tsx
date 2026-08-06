@@ -84,11 +84,6 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess })
     }
   }, [activePhotoModal]);
 
-  // Layout height calculation for dynamic scroll lock
-  const [containerHeight, setContainerHeight] = useState<number>(0);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-  const needsScroll = contentHeight > containerHeight && containerHeight > 0;
-
   // Loading & Error States
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -241,13 +236,8 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess })
       style={[styles.container, { backgroundColor: colors.bgApp }]}
     >
       <ScrollView
-        scrollEnabled={needsScroll}
-        onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
-        onContentSizeChange={(_, h) => setContentHeight(h)}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: needsScroll ? 90 : 16 },
-        ]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         contentOffset={{ x: 0, y: getScrollY('add') }}
         onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'add')}
         scrollEventThrottle={16}
@@ -542,25 +532,25 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 100,
+    paddingTop: 12,
+    paddingBottom: 90,
   },
   title: {
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   photoGrid: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   photoBtn: {
     flex: 1,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
@@ -573,11 +563,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bfdbfe',
     borderRadius: 14,
-    padding: 14,
+    padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   aiHeader: {
     flexDirection: 'row',
@@ -601,7 +591,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   successText: {
     color: '#065f46',
@@ -618,7 +608,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   errorText: {
     color: '#991b1b',
@@ -627,7 +617,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   label: {
     fontSize: 12,
@@ -649,17 +639,17 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     paddingLeft: 42,
     paddingRight: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     fontSize: 15,
     fontWeight: '600',
   },
   submitBtn: {
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 6,
     elevation: 3,
     shadowColor: '#1e3a8a',
     shadowOffset: { width: 0, height: 4 },

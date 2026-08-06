@@ -103,11 +103,6 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
     }
   }, [activePhotoModal]);
 
-  // Layout height calculation for dynamic scroll lock
-  const [containerHeight, setContainerHeight] = useState<number>(0);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-  const needsScroll = contentHeight > containerHeight && containerHeight > 0;
-
   // UI States
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -300,13 +295,8 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
       style={[styles.container, { backgroundColor: colors.bgApp }]}
     >
       <ScrollView
-        scrollEnabled={needsScroll}
-        onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
-        onContentSizeChange={(_, h) => setContentHeight(h)}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: needsScroll ? 90 : 16 },
-        ]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         contentOffset={{ x: 0, y: getScrollY('edit') }}
         onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'edit')}
         scrollEventThrottle={16}
@@ -665,8 +655,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 100,
+    paddingTop: 12,
+    paddingBottom: 90,
   },
   centerBox: {
     flex: 1,
@@ -682,7 +672,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   backBtn: {
     borderRadius: 12,
@@ -704,14 +694,14 @@ const styles = StyleSheet.create({
   photoGrid: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   photoBtn: {
     flex: 1,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
@@ -724,11 +714,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bfdbfe',
     borderRadius: 14,
-    padding: 14,
+    padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   aiHeader: {
     flexDirection: 'row',
@@ -752,7 +742,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   successText: {
     color: '#166534',
@@ -769,7 +759,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   errorText: {
     color: '#991b1b',
@@ -778,7 +768,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   label: {
     fontSize: 12,
@@ -800,17 +790,17 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     paddingLeft: 42,
     paddingRight: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     fontSize: 15,
     fontWeight: '600',
   },
   actionGrid: {
-    gap: 12,
-    marginTop: 12,
+    gap: 10,
+    marginTop: 10,
   },
   submitBtn: {
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -828,7 +818,7 @@ const styles = StyleSheet.create({
   deleteBtn: {
     borderRadius: 14,
     borderWidth: 1.5,
-    paddingVertical: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
