@@ -10,11 +10,15 @@ interface RefuelingCardProps {
 }
 
 export const RefuelingCard: React.FC<RefuelingCardProps> = ({ refueling, onPress }) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { date, cost, liters, price_per_liter, mileage, stats } = refueling;
 
   const formattedDate = new Date(date).toISOString().split('T')[0];
   const hasStats = stats?.fuel_consumption_l_per_100km != null || stats?.cost_per_km != null;
+
+  const badgeBg = theme === 'dark' ? 'rgba(16, 185, 129, 0.15)' : '#f0fdf4';
+  const badgeBorder = theme === 'dark' ? 'rgba(16, 185, 129, 0.3)' : '#bbf7d0';
+  const badgeTextColor = theme === 'dark' ? '#34d399' : '#15803d';
 
   return (
     <TouchableOpacity
@@ -45,8 +49,18 @@ export const RefuelingCard: React.FC<RefuelingCardProps> = ({ refueling, onPress
               {mileage.toLocaleString('pl-PL')} km
             </Text>
             {stats?.distance && stats.distance > 0 ? (
-              <View style={styles.deltaBadge}>
-                <Text style={styles.deltaText}>+{stats.distance} km</Text>
+              <View
+                style={[
+                  styles.deltaBadge,
+                  {
+                    backgroundColor: badgeBg,
+                    borderColor: badgeBorder,
+                  },
+                ]}
+              >
+                <Text style={[styles.deltaText, { color: badgeTextColor }]}>
+                  +{stats.distance} km
+                </Text>
               </View>
             ) : null}
           </View>
@@ -150,16 +164,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   deltaBadge: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
     borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   deltaText: {
-    color: '#15803d',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   detailsRow: {
