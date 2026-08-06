@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,53 +10,58 @@ import {
 } from 'react-native';
 import { Plus, Fuel, AlertCircle, RefreshCw } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useScroll } from '../context/ScrollContext';
+import { useViewControl } from '../context/ViewControlContext';
 import { getRefuelings } from '../services/api';
 import { Refueling } from '../types/api';
 import { RefuelingCard } from '../components/RefuelingCard';
+import { VehicleCard } from '../components/Header';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface HistoryViewProps {
   onNavigateAdd: () => void;
   onNavigateEdit: (id: number) => void;
+  carRefreshTrigger?: number;
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
   onNavigateAdd,
   onNavigateEdit,
+  carRefreshTrigger = 0,
 }) => {
   const { colors } = useTheme();
+  const { getScrollY, setScrollY } = useScroll();
+  const { cachedHistory, setCachedHistory } = useViewControl();
   const insets = useSafeAreaInsets();
-  const [refuelings, setRefuelings] = useState<Refueling[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [refuelings, setRefuelings] = useState<Refueling[]>(cachedHistory);
+  const [loading, setLoading] = useState<boolean>(cachedHistory.length === 0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const fabBottom = Math.max(insets.bottom, 16) + 68;
 
-  // Layout height calculation for dynamic scroll lock
-  const [containerHeight, setContainerHeight] = useState<number>(0);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-  const needsScroll = contentHeight > containerHeight && containerHeight > 0;
-
   const fetchHistory = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (cachedHistory.length === 0) {
         setLoading(true);
       }
       setError(null);
       const data = await getRefuelings('all');
       setRefuelings(data);
+      setCachedHistory(data);
     } catch (err) {
       console.error('Błąd podczas pobierania historii:', err);
-      setError('Nie udało się pobrać historii tankowań.');
+      if (cachedHistory.length === 0) {
+        setError('Nie udało się pobrać historii tankowań.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [cachedHistory.length, setCachedHistory]);
 
   useEffect(() => {
     fetchHistory();
@@ -76,13 +81,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.bgApp }]}>
       <ScrollView
-        scrollEnabled={needsScroll}
-        onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
-        onContentSizeChange={(_, h) => setContentHeight(h)}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: needsScroll ? 90 : 16 },
-        ]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: getScrollY('history') }}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'history')}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -92,6 +95,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           />
         }
       >
+        <VehicleCard refreshTrigger={carRefreshTrigger} />
         {loading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={colors.primary} />

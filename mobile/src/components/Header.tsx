@@ -14,18 +14,47 @@ import {
 } from 'react-native';
 import { Fuel, Settings, Save, AlertCircle, Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useViewControl } from '../context/ViewControlContext';
 import { getCarInfo, updateCarInfo } from '../services/api';
 
-interface HeaderProps {
+interface TopNavBarProps {
   title?: string;
+}
+
+export const TopNavBar: React.FC<TopNavBarProps> = ({ title = 'Statystyki Paliwa' }) => {
+  const { theme, colors, toggleTheme } = useTheme();
+
+  return (
+    <View style={[styles.topNavBarContainer, { backgroundColor: colors.bgApp }]}>
+      <Text style={[styles.headerTitle, { color: colors.textMain }]}>{title}</Text>
+      <TouchableOpacity
+        style={[styles.iconBtn, { backgroundColor: colors.bgCardSecondary }]}
+        onPress={(e) => {
+          const { pageX, pageY } = e.nativeEvent;
+          toggleTheme({ cx: pageX, cy: pageY });
+        }}
+        activeOpacity={0.7}
+      >
+        {theme === 'dark' ? (
+          <Sun size={20} color="#f59e0b" />
+        ) : (
+          <Moon size={20} color={colors.textMain} />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+interface VehicleCardProps {
   refreshTrigger?: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', refreshTrigger = 0 }) => {
-  const { theme, colors, toggleTheme } = useTheme();
+export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) => {
+  const { colors } = useTheme();
+  const { cachedCarInfo, setCachedCarInfo } = useViewControl();
 
-  const [carName, setCarName] = useState<string>('Mój Samochód');
-  const [latestMileage, setLatestMileage] = useState<number | null>(null);
+  const [carName, setCarName] = useState<string>(cachedCarInfo?.name || 'Mój Samochód');
+  const [latestMileage, setLatestMileage] = useState<number | null>(cachedCarInfo?.latest_mileage ?? null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [nameInput, setNameInput] = useState<string>('');
@@ -53,8 +82,10 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
   const fetchCarData = async () => {
     try {
       const data = await getCarInfo();
-      setCarName(data.name || 'Mój Samochód');
+      const name = data.name || 'Mój Samochód';
+      setCarName(name);
       setLatestMileage(data.latest_mileage);
+      setCachedCarInfo({ name, latest_mileage: data.latest_mileage });
     } catch (err) {
       console.error('Błąd podczas pobierania danych samochodu:', err);
     }
@@ -92,6 +123,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
       const updated = await updateCarInfo(nameInput.trim());
       setCarName(updated.name);
       setLatestMileage(updated.latest_mileage);
+      setCachedCarInfo({ name: updated.name, latest_mileage: updated.latest_mileage });
       handleCloseSettings();
     } catch (err) {
       console.error('Błąd podczas zapisu nazwy samochodu:', err);
@@ -102,24 +134,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
   };
 
   return (
-    <View style={[styles.headerContainer, { backgroundColor: colors.bgApp }]}>
-      {/* Top Header Row */}
-      <View style={styles.headerTop}>
-        <Text style={[styles.headerTitle, { color: colors.textMain }]}>{title}</Text>
-        <TouchableOpacity
-          style={[styles.iconBtn, { backgroundColor: colors.bgCardSecondary }]}
-          onPress={toggleTheme}
-          activeOpacity={0.7}
-        >
-          {theme === 'dark' ? (
-            <Sun size={20} color="#f59e0b" />
-          ) : (
-            <Moon size={20} color={colors.textMain} />
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Vehicle Card */}
+    <View style={styles.vehicleCardContainer}>
       <View
         style={[
           styles.vehicleCard,
@@ -152,7 +167,6 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
         </TouchableOpacity>
       </View>
 
-      {/* Modal Ustawień Samochodu */}
       <Modal
         visible={isSettingsOpen}
         transparent
@@ -192,24 +206,21 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
                   style={[
                     styles.input,
                     {
-                      backgroundColor: colors.bgApp,
+                      backgroundColor: colors.bgCardSecondary,
                       borderColor: colors.borderColor,
                       color: colors.textMain,
                     },
                   ]}
                   value={nameInput}
                   onChangeText={setNameInput}
-                  placeholder="np. Toyota Corolla, Audi A4..."
-                  placeholderTextColor={colors.textLight}
+                  placeholder="Wpisz nazwę (np. Audi A4)"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
                 />
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity
-                    style={[
-                      styles.btnPrimary,
-                      { backgroundColor: colors.primary },
-                      isSaving && { opacity: 0.7 },
-                    ]}
+                    style={[styles.btnSave, { backgroundColor: colors.primary }]}
                     onPress={handleSaveName}
                     disabled={isSaving}
                     activeOpacity={0.8}
@@ -218,16 +229,17 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
                       <ActivityIndicator size="small" color="#ffffff" />
                     ) : (
                       <>
-                        <Save size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                        <Text style={styles.btnPrimaryText}>Zapisz nazwę</Text>
+                        <Save size={18} color="#ffffff" />
+                        <Text style={styles.btnSaveText}>Zapisz</Text>
                       </>
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.btnCancel, { backgroundColor: colors.bgCardSecondary }]}
+                    style={[styles.btnCancel, { borderColor: colors.borderColor }]}
                     onPress={handleCloseSettings}
-                    activeOpacity={0.8}
+                    disabled={isSaving}
+                    activeOpacity={0.7}
                   >
                     <Text style={[styles.btnCancelText, { color: colors.textMuted }]}>
                       Anuluj
@@ -243,17 +255,33 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
   );
 };
 
+interface HeaderProps {
+  title?: string;
+  refreshTrigger?: number;
+}
+
+export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', refreshTrigger = 0 }) => {
+  return (
+    <View>
+      <TopNavBar title={title} />
+      <View style={{ paddingHorizontal: 20 }}>
+        <VehicleCard refreshTrigger={refreshTrigger} />
+      </View>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
-  headerContainer: {
+  topNavBarContainer: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 12,
-  },
-  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+  },
+  vehicleCardContainer: {
+    marginBottom: 16,
   },
   headerTitle: {
     fontSize: 22,
@@ -357,14 +385,15 @@ const styles = StyleSheet.create({
   modalActions: {
     gap: 8,
   },
-  btnPrimary: {
+  btnSave: {
     borderRadius: 12,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
-  btnPrimaryText: {
+  btnSaveText: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',

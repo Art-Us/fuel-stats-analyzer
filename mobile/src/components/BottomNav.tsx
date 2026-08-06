@@ -12,11 +12,17 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab }) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Safe area bottom inset for gesture navigation bar / home indicator
-  const safeBottom = Math.max(insets.bottom, 16);
+  const safeBottom = Math.max(insets.bottom, 14);
+
+  const tabs: { key: TabType; label: string; Icon: React.ComponentType<{ size: number; color: string }> }[] = [
+    { key: 'history', label: 'Historia', Icon: History },
+    { key: 'add', label: 'Dodaj', Icon: PlusCircle },
+    { key: 'stats', label: 'Statystyki', Icon: BarChart2 },
+  ];
 
   return (
     <View
@@ -26,90 +32,52 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab })
           backgroundColor: colors.bgCard,
           borderTopColor: colors.borderColor,
           paddingBottom: safeBottom,
-          height: 58 + safeBottom,
+          height: 60 + safeBottom,
         },
       ]}
     >
-      {/* Historia */}
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onSelectTab('history')}
-        activeOpacity={0.8}
-      >
-        <View
-          style={[
-            styles.iconWrapper,
-            currentTab === 'history' && { backgroundColor: colors.primary },
-          ]}
-        >
-          <History
-            size={20}
-            color={currentTab === 'history' ? '#ffffff' : colors.textMuted}
-          />
-        </View>
-        <Text
-          style={[
-            styles.navText,
-            { color: currentTab === 'history' ? colors.primary : colors.textMuted },
-          ]}
-        >
-          Historia
-        </Text>
-      </TouchableOpacity>
+      {tabs.map(({ key, label, Icon }) => {
+        const isActive = currentTab === key;
+        const activeBg = theme === 'dark' ? 'rgba(37, 99, 235, 0.22)' : 'rgba(37, 99, 235, 0.1)';
+        const activeIconColor = colors.accent || colors.primary;
+        const activeTextColor = colors.accent || colors.primary;
 
-      {/* Dodaj */}
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onSelectTab('add')}
-        activeOpacity={0.8}
-      >
-        <View
-          style={[
-            styles.iconWrapper,
-            currentTab === 'add' && { backgroundColor: colors.primary },
-          ]}
-        >
-          <PlusCircle
-            size={20}
-            color={currentTab === 'add' ? '#ffffff' : colors.textMuted}
-          />
-        </View>
-        <Text
-          style={[
-            styles.navText,
-            { color: currentTab === 'add' ? colors.primary : colors.textMuted },
-          ]}
-        >
-          Dodaj
-        </Text>
-      </TouchableOpacity>
-
-      {/* Statystyki */}
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onSelectTab('stats')}
-        activeOpacity={0.8}
-      >
-        <View
-          style={[
-            styles.iconWrapper,
-            currentTab === 'stats' && { backgroundColor: colors.primary },
-          ]}
-        >
-          <BarChart2
-            size={20}
-            color={currentTab === 'stats' ? '#ffffff' : colors.textMuted}
-          />
-        </View>
-        <Text
-          style={[
-            styles.navText,
-            { color: currentTab === 'stats' ? colors.primary : colors.textMuted },
-          ]}
-        >
-          Statystyki
-        </Text>
-      </TouchableOpacity>
+        return (
+          <TouchableOpacity
+            key={key}
+            style={styles.navItem}
+            onPress={() => onSelectTab(key)}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.iconWrapper,
+                isActive && {
+                  backgroundColor: activeBg,
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                },
+              ]}
+            >
+              <Icon
+                size={21}
+                color={isActive ? activeIconColor : colors.textMuted}
+              />
+            </View>
+            <Text
+              style={[
+                styles.navText,
+                {
+                  color: isActive ? activeTextColor : colors.textMuted,
+                  fontWeight: isActive ? '700' : '500',
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 };
@@ -124,29 +92,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingTop: 6,
-    elevation: 10,
+    elevation: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingHorizontal: 16,
+    gap: 3,
+    flex: 1,
   },
   iconWrapper: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 5,
+    borderRadius: 20,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   navText: {
     fontSize: 11.5,
-    fontWeight: '600',
   },
 });

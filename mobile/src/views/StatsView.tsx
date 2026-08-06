@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,13 +29,16 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
+import { useScroll } from '../context/ScrollContext';
+import { useViewControl } from '../context/ViewControlContext';
 import { getStats, getRefuelings } from '../services/api';
 import { StatsResponse, PeriodType, Refueling } from '../types/api';
+import { VehicleCard } from '../components/Header';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CHART_HEIGHT = 205;
+const CHART_HEIGHT = 190;
 
 interface AreaChartItemProps {
   data: { label: string; fullDate?: string; value: number | null }[];
@@ -43,6 +46,10 @@ interface AreaChartItemProps {
   gradientId: string;
   unit: string;
   colors: any;
+}
+
+interface StatsViewProps {
+  carRefreshTrigger?: number;
 }
 
 const AreaChartItem: React.FC<AreaChartItemProps> = ({
@@ -260,18 +267,35 @@ const AreaChartItem: React.FC<AreaChartItemProps> = ({
   );
 };
 
-export const StatsView: React.FC = () => {
+export const StatsView: React.FC<StatsViewProps> = ({ carRefreshTrigger = 0 }) => {
   const { colors } = useTheme();
-  const [period, setPeriod] = useState<PeriodType>('month');
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [history, setHistory] = useState<Refueling[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const {
+    getScrollY,
+    setScrollY,
+    getKpiScrollX,
+    setKpiScrollX,
+    getChartScrollX,
+    setChartScrollX,
+  } = useScroll();
+  const {
+    statsPeriod: period,
+    setStatsPeriod: setPeriod,
+    cachedStats,
+    setCachedStats,
+    cachedStatsHistory,
+    setCachedStatsHistory,
+  } = useViewControl();
+  const [stats, setStats] = useState<StatsResponse | null>(cachedStats);
+  const [history, setHistory] = useState<Refueling[]>(cachedStatsHistory);
+  const [loading, setLoading] = useState<boolean>(!cachedStats);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (!cachedStats) {
+          setLoading(true);
+        }
         setError(null);
 
         const [statsData, historyData] = await Promise.all([
@@ -280,10 +304,14 @@ export const StatsView: React.FC = () => {
         ]);
 
         setStats(statsData);
+        setCachedStats(statsData);
         setHistory(historyData);
+        setCachedStatsHistory(historyData);
       } catch (err) {
         console.error('Błąd podczas pobierania statystyk:', err);
-        setError('Nie udało się pobrać statystyk.');
+        if (!cachedStats) {
+          setError('Nie udało się pobrać statystyk.');
+        }
       } finally {
         setLoading(false);
       }
@@ -307,28 +335,16 @@ export const StatsView: React.FC = () => {
       distance: item.stats?.distance ?? null,
     }));
 
-  const [containerHeight, setContainerHeight] = useState<number>(0);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-
-  const needsScroll = contentHeight > 0 && containerHeight > 0 && contentHeight > containerHeight;
-  const dynamicPaddingBottom = needsScroll ? 80 : 16;
-
   return (
-    <View
-      style={[styles.container, { backgroundColor: colors.bgApp }]}
-      onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
-    >
+    <View style={[styles.container, { backgroundColor: colors.bgApp }]}>
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: dynamicPaddingBottom },
-        ]}
-        onContentSizeChange={(_w, h) => setContentHeight(h)}
-        alwaysBounceVertical={needsScroll}
-        showsVerticalScrollIndicator={needsScroll}
-        overScrollMode={needsScroll ? 'auto' : 'never'}
-        scrollEnabled={needsScroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: getScrollY('stats') }}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'stats')}
+        scrollEventThrottle={16}
       >
+        <VehicleCard refreshTrigger={carRefreshTrigger} />
         <Text style={[styles.title, { color: colors.textMain }]}>Statystyki i Analiza</Text>
 
         {/* Period Tabs */}
@@ -392,6 +408,9 @@ export const StatsView: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               style={styles.swiper}
               contentContainerStyle={styles.swiperContainer}
+              contentOffset={{ x: getKpiScrollX(), y: 0 }}
+              onScroll={(e) => setKpiScrollX(e.nativeEvent.contentOffset.x)}
+              scrollEventThrottle={16}
             >
               {/* Card 1 */}
               <View
@@ -511,6 +530,9 @@ export const StatsView: React.FC = () => {
                 showsHorizontalScrollIndicator={false}
                 style={styles.swiper}
                 contentContainerStyle={styles.swiperContainer}
+                contentOffset={{ x: getChartScrollX(), y: 0 }}
+                onScroll={(e) => setChartScrollX(e.nativeEvent.contentOffset.x)}
+                scrollEventThrottle={16}
               >
                 {/* Chart 1: Trend Wydatków */}
                 <View
@@ -678,20 +700,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 80,
+    paddingTop: 14,
+    paddingBottom: 88,
   },
   title: {
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   periodTabs: {
     flexDirection: 'row',
     borderWidth: 1,
     padding: 4,
     borderRadius: 14,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   tabBtn: {
     flex: 1,
@@ -699,8 +721,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
+    overflow: 'hidden',
   },
   tabActive: {
+    borderRadius: 10,
+    overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -738,7 +763,7 @@ const styles = StyleSheet.create({
   },
   swiper: {
     marginHorizontal: -20,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   swiperContainer: {
     paddingHorizontal: 20,
@@ -746,9 +771,9 @@ const styles = StyleSheet.create({
   kpiCard: {
     width: CARD_WIDTH,
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
-    gap: 16,
+    gap: 12,
     marginRight: CARD_GAP,
   },
   kpiHeader: {
