@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,8 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
+import { useScroll } from '../context/ScrollContext';
+import { useViewControl } from '../context/ViewControlContext';
 import { getStats, getRefuelings } from '../services/api';
 import { StatsResponse, PeriodType, Refueling } from '../types/api';
 
@@ -262,16 +264,33 @@ const AreaChartItem: React.FC<AreaChartItemProps> = ({
 
 export const StatsView: React.FC = () => {
   const { colors } = useTheme();
-  const [period, setPeriod] = useState<PeriodType>('month');
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [history, setHistory] = useState<Refueling[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const {
+    getScrollY,
+    setScrollY,
+    getKpiScrollX,
+    setKpiScrollX,
+    getChartScrollX,
+    setChartScrollX,
+  } = useScroll();
+  const {
+    statsPeriod: period,
+    setStatsPeriod: setPeriod,
+    cachedStats,
+    setCachedStats,
+    cachedStatsHistory,
+    setCachedStatsHistory,
+  } = useViewControl();
+  const [stats, setStats] = useState<StatsResponse | null>(cachedStats);
+  const [history, setHistory] = useState<Refueling[]>(cachedStatsHistory);
+  const [loading, setLoading] = useState<boolean>(!cachedStats);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (!cachedStats) {
+          setLoading(true);
+        }
         setError(null);
 
         const [statsData, historyData] = await Promise.all([
@@ -280,10 +299,14 @@ export const StatsView: React.FC = () => {
         ]);
 
         setStats(statsData);
+        setCachedStats(statsData);
         setHistory(historyData);
+        setCachedStatsHistory(historyData);
       } catch (err) {
         console.error('Błąd podczas pobierania statystyk:', err);
-        setError('Nie udało się pobrać statystyk.');
+        if (!cachedStats) {
+          setError('Nie udało się pobrać statystyk.');
+        }
       } finally {
         setLoading(false);
       }
@@ -307,27 +330,14 @@ export const StatsView: React.FC = () => {
       distance: item.stats?.distance ?? null,
     }));
 
-  const [containerHeight, setContainerHeight] = useState<number>(0);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-
-  const needsScroll = contentHeight > 0 && containerHeight > 0 && contentHeight > containerHeight;
-  const dynamicPaddingBottom = needsScroll ? 80 : 16;
-
   return (
-    <View
-      style={[styles.container, { backgroundColor: colors.bgApp }]}
-      onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
-    >
+    <View style={[styles.container, { backgroundColor: colors.bgApp }]}>
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: dynamicPaddingBottom },
-        ]}
-        onContentSizeChange={(_w, h) => setContentHeight(h)}
-        alwaysBounceVertical={needsScroll}
-        showsVerticalScrollIndicator={needsScroll}
-        overScrollMode={needsScroll ? 'auto' : 'never'}
-        scrollEnabled={needsScroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: getScrollY('stats') }}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'stats')}
+        scrollEventThrottle={16}
       >
         <Text style={[styles.title, { color: colors.textMain }]}>Statystyki i Analiza</Text>
 
@@ -392,6 +402,9 @@ export const StatsView: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               style={styles.swiper}
               contentContainerStyle={styles.swiperContainer}
+              contentOffset={{ x: getKpiScrollX(), y: 0 }}
+              onScroll={(e) => setKpiScrollX(e.nativeEvent.contentOffset.x)}
+              scrollEventThrottle={16}
             >
               {/* Card 1 */}
               <View
@@ -511,6 +524,9 @@ export const StatsView: React.FC = () => {
                 showsHorizontalScrollIndicator={false}
                 style={styles.swiper}
                 contentContainerStyle={styles.swiperContainer}
+                contentOffset={{ x: getChartScrollX(), y: 0 }}
+                onScroll={(e) => setChartScrollX(e.nativeEvent.contentOffset.x)}
+                scrollEventThrottle={16}
               >
                 {/* Chart 1: Trend Wydatków */}
                 <View

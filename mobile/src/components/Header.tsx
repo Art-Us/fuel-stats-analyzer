@@ -108,7 +108,10 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa', ref
         <Text style={[styles.headerTitle, { color: colors.textMain }]}>{title}</Text>
         <TouchableOpacity
           style={[styles.iconBtn, { backgroundColor: colors.bgCardSecondary }]}
-          onPress={toggleTheme}
+          onPress={(e) => {
+            const { pageX, pageY } = e.nativeEvent;
+            toggleTheme({ cx: pageX, cy: pageY });
+          }}
           activeOpacity={0.7}
         >
           {theme === 'dark' ? (

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
+import { useScroll } from '../context/ScrollContext';
 import {
   getRefuelingById,
   updateRefueling,
@@ -52,6 +53,7 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
   onSuccess,
 }) => {
   const { colors } = useTheme();
+  const { getScrollY, setScrollY } = useScroll();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -305,6 +307,9 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
           styles.scrollContent,
           { paddingBottom: needsScroll ? 90 : 16 },
         ]}
+        contentOffset={{ x: 0, y: getScrollY('edit') }}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'edit')}
+        scrollEventThrottle={16}
       >
         {/* Header Bar */}
         <View style={styles.topRow}>

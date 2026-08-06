@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
+import { useScroll } from '../context/ScrollContext';
 import { analyzePhotos, createRefueling, MobileImageFile } from '../services/api';
 
 import { DatePickerModal } from '../components/DatePickerModal';
@@ -37,6 +38,7 @@ interface AddRefuelingViewProps {
 
 export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess }) => {
   const { colors } = useTheme();
+  const { getScrollY, setScrollY } = useScroll();
 
   // Form state
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -246,6 +248,9 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess })
           styles.scrollContent,
           { paddingBottom: needsScroll ? 90 : 16 },
         ]}
+        contentOffset={{ x: 0, y: getScrollY('add') }}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y, 'add')}
+        scrollEventThrottle={16}
       >
         <Text style={[styles.title, { color: colors.textMain }]}>Dodaj nowe tankowanie</Text>
 
