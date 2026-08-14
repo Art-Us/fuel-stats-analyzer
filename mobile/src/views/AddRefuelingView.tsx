@@ -33,6 +33,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { useScroll } from '../context/ScrollContext';
+import { useViewControl } from '../context/ViewControlContext';
 import { analyzePhotos, createRefueling, MobileImageFile, uploadPhotosFast, getRefuelings } from '../services/api';
 
 import { DatePickerModal } from '../components/DatePickerModal';
@@ -54,21 +55,38 @@ interface AddRefuelingViewProps {
 export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, carRefreshTrigger = 0 }) => {
   const { colors } = useTheme();
   const { getScrollY, setScrollY } = useScroll();
+  const { addFormDraft, setAddFormDraft, resetAddFormDraft } = useViewControl();
 
-  // Form state
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const {
+    date,
+    cost,
+    liters,
+    pricePerLiter,
+    mileage,
+    photos,
+    receiptImageUrl,
+    dashboardImageUrl,
+    hasAnalyzedCurrentPhotos,
+  } = addFormDraft;
+
+  const setDate = (val: string) => setAddFormDraft(prev => ({ ...prev, date: val }));
+  const setCost = (val: string) => setAddFormDraft(prev => ({ ...prev, cost: val }));
+  const setLiters = (val: string) => setAddFormDraft(prev => ({ ...prev, liters: val }));
+  const setPricePerLiter = (val: string) => setAddFormDraft(prev => ({ ...prev, pricePerLiter: val }));
+  const setMileage = (val: string) => setAddFormDraft(prev => ({ ...prev, mileage: val }));
+  const setPhotos = (val: MobileImageFile[] | ((prev: MobileImageFile[]) => MobileImageFile[])) => {
+    setAddFormDraft(prev => ({
+      ...prev,
+      photos: typeof val === 'function' ? val(prev.photos) : val,
+    }));
+  };
+  const setReceiptImageUrl = (val: string | null) => setAddFormDraft(prev => ({ ...prev, receiptImageUrl: val }));
+  const setDashboardImageUrl = (val: string | null) => setAddFormDraft(prev => ({ ...prev, dashboardImageUrl: val }));
+  const setHasAnalyzedCurrentPhotos = (val: boolean) => setAddFormDraft(prev => ({ ...prev, hasAnalyzedCurrentPhotos: val }));
+
+  // UI Modals state
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
-  const [cost, setCost] = useState<string>('');
-  const [liters, setLiters] = useState<string>('');
-  const [pricePerLiter, setPricePerLiter] = useState<string>('');
-  const [mileage, setMileage] = useState<string>('');
-  const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
-  const [dashboardImageUrl, setDashboardImageUrl] = useState<string | null>(null);
-
-  // Photos & Multi-Photo Upload state (1 to 3 photos)
-  const [photos, setPhotos] = useState<MobileImageFile[]>([]);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState<boolean>(false);
-  const [hasAnalyzedCurrentPhotos, setHasAnalyzedCurrentPhotos] = useState<boolean>(false);
   const [existingPhotosMap, setExistingPhotosMap] = useState<Map<string, { date: string; id: number }>>(new Map());
 
   // Pobranie listy istniejących tankowań aby weryfikować unikalność zdjęć
@@ -410,6 +428,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
         dashboard_image_url: finalDashboardUrl,
       });
 
+      resetAddFormDraft();
       onSuccess();
     } catch (err: any) {
       console.error('Błąd zapisu tankowania:', err);
