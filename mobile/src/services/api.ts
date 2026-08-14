@@ -240,4 +240,6 @@ export const updateCarInfo = async (name: string, gemini_api_key?: string): Prom
   return response.data;
 };
 
+export const getExportBackupUrl = (): string => `${API_BASE_URL}/backup/export`;
+
 export default api;

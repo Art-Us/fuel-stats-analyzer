@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff } from 'lucide-react';
-import { getCarInfo, updateCarInfo } from '../services/api';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Download } from 'lucide-react';
+import { getCarInfo, updateCarInfo, getExportBackupUrl } from '../services/api';
 
 interface HeaderProps {
   title?: string;
@@ -159,11 +159,35 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
             className={`modal-sheet ${isClosingModal ? 'closing' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-              Ustawienia aplikacji
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                Ustawienia aplikacji
+              </h3>
+              <a
+                href={getExportBackupUrl()}
+                download
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-card-secondary)',
+                  color: 'var(--color-primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                }}
+                title="Pobierz pełną kopię zapasową danych i zdjęć w archiwum ZIP"
+              >
+                <Download size={15} />
+                <span>Eksportuj ZIP</span>
+              </a>
+            </div>
             <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Dostosuj nazwę samochodu oraz opcjonalny własny klucz API Google Gemini.
+              Dostosuj dane pojazdu, klucz API lub pobierz pełną kopię zapasową danych ze zdjęciami.
             </p>
 
             {errorMsg && (

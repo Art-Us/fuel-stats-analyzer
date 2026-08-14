@@ -11,11 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Linking,
 } from 'react-native';
-import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Key } from 'lucide-react-native';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Key, Download } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useViewControl } from '../context/ViewControlContext';
-import { getCarInfo, updateCarInfo } from '../services/api';
+import { getCarInfo, updateCarInfo, getExportBackupUrl } from '../services/api';
 
 interface TopNavBarProps {
   title?: string;
@@ -61,6 +62,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
   const [apiKeyInput, setApiKeyInput] = useState<string>(cachedCarInfo?.gemini_api_key || '');
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const slideAnim = useRef(new Animated.Value(450)).current;
@@ -117,6 +119,19 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
     setShowApiKey(false);
     setErrorMsg(null);
     setIsSettingsOpen(true);
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      setIsExporting(true);
+      const url = getExportBackupUrl();
+      await Linking.openURL(url);
+    } catch (err) {
+      console.error('Błąd podczas otwierania eksportu ZIP:', err);
+      setErrorMsg('Nie udało się pobrać pliku eksportu.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -197,11 +212,35 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
               ]}
             >
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <Text style={[styles.modalTitle, { color: colors.textMain }]}>
-                  Ustawienia aplikacji
-                </Text>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={[styles.modalTitle, { color: colors.textMain }]}>
+                    Ustawienia aplikacji
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.exportBtn,
+                      {
+                        backgroundColor: colors.bgCardSecondary,
+                        borderColor: colors.borderColor,
+                      },
+                    ]}
+                    onPress={handleExportBackup}
+                    disabled={isExporting}
+                    activeOpacity={0.7}
+                  >
+                    {isExporting ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <Download size={16} color={colors.primary} />
+                        <Text style={[styles.exportBtnText, { color: colors.primary }]}>Eksportuj ZIP</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
                 <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  Dostosuj nazwę samochodu oraz opcjonalny własny klucz API Google Gemini.
+                  Dostosuj dane pojazdu, klucz API lub pobierz pełną kopię zapasową danych ze zdjęciami.
                 </Text>
 
                 {errorMsg && (
@@ -394,10 +433,29 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
   },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    flex: 1,
+  },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  exportBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   modalSub: {
     fontSize: 13,
