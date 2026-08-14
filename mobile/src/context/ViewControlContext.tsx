@@ -5,6 +5,7 @@ import { MobileImageFile } from '../services/api';
 export interface CarInfoCache {
   name: string;
   latest_mileage: number | null;
+  gemini_api_key?: string | null;
 }
 
 export interface AddFormDraft {

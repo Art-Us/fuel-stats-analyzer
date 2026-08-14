@@ -3,6 +3,7 @@ import request from 'supertest';
 import express from 'express';
 import refuelingsRouter from '../src/routes/refuelings.js';
 import statsRouter from '../src/routes/stats.js';
+import carRouter from '../src/routes/car.js';
 import { errorHandler } from '../src/middleware/errorHandler.js';
 import { getDatabase } from '../src/db.js';
 import { removePhotoFile } from '../src/utils/fileOrganizer.js';
@@ -11,6 +12,7 @@ const app = express();
 app.use(express.json());
 app.use('/api/refuelings', refuelingsRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/car', carRouter);
 app.use(errorHandler);
 
 describe('API Refuelings & Stats Endpoints', () => {
@@ -193,5 +195,23 @@ describe('API Refuelings & Stats Endpoints', () => {
 
     expect(res2.status).toBe(201);
     expect(res2.body.receipt_image_url).toBeNull();
+  });
+
+  it('PUT /api/car powinien zaktualizować nazwę samochodu oraz klucz Gemini API', async () => {
+    const updateRes = await request(app)
+      .put('/api/car')
+      .send({
+        name: 'Testowa Skoda Octavia',
+        gemini_api_key: 'AIzaSy_TEST_KEY_123'
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.name).toBe('Testowa Skoda Octavia');
+    expect(updateRes.body.gemini_api_key).toBe('AIzaSy_TEST_KEY_123');
+
+    const getRes = await request(app).get('/api/car');
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.name).toBe('Testowa Skoda Octavia');
+    expect(getRes.body.gemini_api_key).toBe('AIzaSy_TEST_KEY_123');
   });
 });

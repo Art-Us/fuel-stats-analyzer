@@ -4,7 +4,8 @@ import {
   CreateRefuelingDTO,
   AnalyzeResponse,
   StatsResponse,
-  PeriodType
+  PeriodType,
+  CarInfo
 } from '../types/api';
 
 const api = axios.create({
@@ -95,16 +96,16 @@ export const deleteRefueling = async (id: number): Promise<{ message: string; id
 /**
  * Pobiera dane samochodu: nazwę i najnowszy przebieg (GET /api/car)
  */
-export const getCarInfo = async (): Promise<{ name: string; latest_mileage: number | null }> => {
-  const response = await api.get<{ name: string; latest_mileage: number | null }>('/car');
+export const getCarInfo = async (): Promise<CarInfo> => {
+  const response = await api.get<CarInfo>('/car');
   return response.data;
 };
 
 /**
- * Aktualizuje nazwę samochodu (PUT /api/car)
+ * Aktualizuje dane samochodu i opcjonalny klucz API (PUT /api/car)
  */
-export const updateCarInfo = async (name: string): Promise<{ name: string; latest_mileage: number | null }> => {
-  const response = await api.put<{ name: string; latest_mileage: number | null }>('/car', { name });
+export const updateCarInfo = async (name: string, gemini_api_key?: string): Promise<CarInfo> => {
+  const response = await api.put<CarInfo>('/car', { name, gemini_api_key });
   return response.data;
 };
 

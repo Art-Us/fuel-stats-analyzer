@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Fuel, Settings, Save, AlertCircle, Sun, Moon } from 'lucide-react';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff } from 'lucide-react';
 import { getCarInfo, updateCarInfo } from '../services/api';
 
 interface HeaderProps {
@@ -13,6 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
 
   const [carName, setCarName] = useState<string>('Mój Samochód');
   const [latestMileage, setLatestMileage] = useState<number | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
 
   // Theme State (Dark / Light Mode)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -38,6 +39,8 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isClosingModal, setIsClosingModal] = useState<boolean>(false);
   const [nameInput, setNameInput] = useState<string>('');
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -46,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
       const data = await getCarInfo();
       setCarName(data.name || 'Mój Samochód');
       setLatestMileage(data.latest_mileage);
+      setGeminiApiKey(data.gemini_api_key || '');
     } catch (err) {
       console.error('Błąd podczas pobierania danych samochodu:', err);
     }
@@ -69,6 +73,8 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
 
   const handleOpenSettings = () => {
     setNameInput(carName);
+    setApiKeyInput(geminiApiKey);
+    setShowApiKey(false);
     setErrorMsg(null);
     setIsSettingsOpen(true);
   };
@@ -82,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
     }, 200);
   };
 
-  const handleSaveName = async (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameInput.trim()) {
       setErrorMsg('Nazwa samochodu nie może być pusta.');
@@ -92,13 +98,14 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
     try {
       setIsSaving(true);
       setErrorMsg(null);
-      const updated = await updateCarInfo(nameInput.trim());
+      const updated = await updateCarInfo(nameInput.trim(), apiKeyInput.trim());
       setCarName(updated.name);
       setLatestMileage(updated.latest_mileage);
+      setGeminiApiKey(updated.gemini_api_key || '');
       closeModal();
     } catch (err: any) {
-      console.error('Błąd podczas zapisu nazwy samochodu:', err);
-      setErrorMsg('Nie udało się zapisać nowej nazwy.');
+      console.error('Błąd podczas zapisu ustawień:', err);
+      setErrorMsg('Nie udało się zapisać ustawień.');
     } finally {
       setIsSaving(false);
     }
@@ -153,10 +160,10 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-              Ustawienia samochodu
+              Ustawienia aplikacji
             </h3>
             <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Wprowadź nową nazwę samochodu. Przebieg odświeża się automatycznie z ostatniego tankowania.
+              Dostosuj nazwę samochodu oraz opcjonalny własny klucz API Google Gemini.
             </p>
 
             {errorMsg && (
@@ -166,7 +173,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
               </div>
             )}
 
-            <form onSubmit={handleSaveName} className="form-container">
+            <form onSubmit={handleSaveSettings} className="form-container">
               <div className="form-group">
                 <label htmlFor="car-name-input">Nazwa samochodu</label>
                 <input
@@ -181,7 +188,46 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label htmlFor="gemini-key-input">Klucz Gemini API (opcjonalnie)</label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    id="gemini-key-input"
+                    type={showApiKey ? 'text' : 'password'}
+                    className="form-input"
+                    style={{ paddingLeft: '14px', paddingRight: '42px', width: '100%' }}
+                    placeholder="Wklej swój klucz API Gemini (AI Studio)"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                  />
+                  <button
+                    type="button"
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '4px',
+                    }}
+                    onClick={() => setShowApiKey((prev) => !prev)}
+                    title={showApiKey ? 'Ukryj klucz API' : 'Pokaż klucz API'}
+                  >
+                    {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                  Jeśli podasz własny klucz, zostanie on użyty do analizy zdjęć przez AI.
+                </small>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                 <button
                   type="submit"
                   className="btn-primary"
@@ -194,7 +240,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
                     </>
                   ) : (
                     <>
-                      <Save size={18} /> Zapisz nazwę
+                      <Save size={18} /> Zapisz
                     </>
                   )}
                 </button>

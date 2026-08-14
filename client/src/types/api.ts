@@ -49,3 +49,9 @@ export interface StatsResponse {
   average_fuel_consumption: number | null;
   average_price_per_km: number | null;
 }
+
+export interface CarInfo {
+  name: string;
+  latest_mileage: number | null;
+  gemini_api_key?: string | null;
+}

@@ -51,7 +51,8 @@ export interface StatsResponse {
 }
 
 export interface CarInfo {
-  id: number;
+  id?: number;
   name: string;
   latest_mileage: number | null;
+  gemini_api_key?: string | null;
 }

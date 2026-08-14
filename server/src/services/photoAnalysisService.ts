@@ -5,11 +5,37 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { AppError } from '../middleware/errorHandler.js';
 
+import { getDatabase } from '../db.js';
+
 export interface OllamaAnalysisResult {
   cost: number;
   liters: number;
   price_per_liter: number;
   mileage: number;
+}
+
+/**
+ * Pobiera aktywny klucz API Gemini:
+ * 1. Z podanego parametru żądania (jeśli jest)
+ * 2. Z tabeli settings w bazie danych SQLite (klucz 'gemini_api_key')
+ * 3. Ze zmiennych środowiskowych .env (GEMINI_API_KEY)
+ */
+export async function getEffectiveGeminiApiKey(customApiKey?: string | null): Promise<string> {
+  if (customApiKey && customApiKey.trim().length > 0) {
+    return customApiKey.trim();
+  }
+
+  try {
+    const db = await getDatabase();
+    const setting = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['gemini_api_key']);
+    if (setting && setting.value && setting.value.trim().length > 0) {
+      return setting.value.trim();
+    }
+  } catch (_) {}
+
+  dotenv.config({ override: true });
+  const rawKey = process.env.GEMINI_API_KEY || '';
+  return rawKey.trim().replace(/^["']|["']$/g, '');
 }
 
 /**
@@ -46,15 +72,14 @@ export async function performOcr(_filePath: string): Promise<string> {
  * Wysyła zdjęcia bezpośrednio do Google Gemini 1.5 Flash Vision API (bez używania Tesseract OCR).
  */
 export async function analyzeWithGemini(
-  filePaths: string[] | string
+  filePaths: string[] | string,
+  customApiKey?: string | null
 ): Promise<OllamaAnalysisResult> {
-  dotenv.config({ override: true });
-  const rawKey = process.env.GEMINI_API_KEY || '';
-  const apiKey = rawKey.trim().replace(/^["']|["']$/g, '');
+  const apiKey = await getEffectiveGeminiApiKey(customApiKey);
 
   if (!apiKey) {
-    console.warn('[Gemini Warning] Brak klucza GEMINI_API_KEY w pliku .env lub jest pusty! Nie można użyć Gemini API.');
-    return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
+    console.warn('[Gemini Warning] Brak klucza GEMINI_API_KEY w ustawieniach bazy oraz w pliku .env!');
+    throw new AppError('Brak klucza Gemini API. Podaj klucz w Ustawieniach aplikacji lub w pliku .env.', 400);
   }
 
   const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
@@ -161,10 +186,11 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
  * Główna funkcja orkiestrująca analizę zdjęć bezpośrednio przez Gemini Vision API.
  */
 export async function analyzePhotosWithAi(
-  filePaths: string[] | string
+  filePaths: string[] | string,
+  customApiKey?: string | null
 ): Promise<OllamaAnalysisResult> {
   console.log('[AI Service] Wywołuję bezpośrednią analizę wizyjną zdjęć przez Gemini 1.5 Flash API...');
-  return await analyzeWithGemini(filePaths);
+  return await analyzeWithGemini(filePaths, customApiKey);
 }
 
 export async function analyzeTextWithOllama(): Promise<OllamaAnalysisResult> {

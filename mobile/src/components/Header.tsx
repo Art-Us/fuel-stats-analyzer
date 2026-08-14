@@ -12,7 +12,7 @@ import {
   Platform,
   Animated,
 } from 'react-native';
-import { Fuel, Settings, Save, AlertCircle, Sun, Moon } from 'lucide-react-native';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Key } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useViewControl } from '../context/ViewControlContext';
 import { getCarInfo, updateCarInfo } from '../services/api';
@@ -58,6 +58,8 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [nameInput, setNameInput] = useState<string>('');
+  const [apiKeyInput, setApiKeyInput] = useState<string>(cachedCarInfo?.gemini_api_key || '');
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -85,7 +87,11 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
       const name = data.name || 'Mój Samochód';
       setCarName(name);
       setLatestMileage(data.latest_mileage);
-      setCachedCarInfo({ name, latest_mileage: data.latest_mileage });
+      setCachedCarInfo({
+        name,
+        latest_mileage: data.latest_mileage,
+        gemini_api_key: data.gemini_api_key || '',
+      });
     } catch (err) {
       console.error('Błąd podczas pobierania danych samochodu:', err);
     }
@@ -107,11 +113,13 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
 
   const handleOpenSettings = () => {
     setNameInput(carName);
+    setApiKeyInput(cachedCarInfo?.gemini_api_key || '');
+    setShowApiKey(false);
     setErrorMsg(null);
     setIsSettingsOpen(true);
   };
 
-  const handleSaveName = async () => {
+  const handleSaveSettings = async () => {
     if (!nameInput.trim()) {
       setErrorMsg('Nazwa samochodu nie może być pusta.');
       return;
@@ -120,14 +128,18 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
     try {
       setIsSaving(true);
       setErrorMsg(null);
-      const updated = await updateCarInfo(nameInput.trim());
+      const updated = await updateCarInfo(nameInput.trim(), apiKeyInput.trim());
       setCarName(updated.name);
       setLatestMileage(updated.latest_mileage);
-      setCachedCarInfo({ name: updated.name, latest_mileage: updated.latest_mileage });
+      setCachedCarInfo({
+        name: updated.name,
+        latest_mileage: updated.latest_mileage,
+        gemini_api_key: updated.gemini_api_key || '',
+      });
       handleCloseSettings();
     } catch (err) {
-      console.error('Błąd podczas zapisu nazwy samochodu:', err);
-      setErrorMsg('Nie udało się zapisać nowej nazwy.');
+      console.error('Błąd podczas zapisu ustawień:', err);
+      setErrorMsg('Nie udało się zapisać ustawień.');
     } finally {
       setIsSaving(false);
     }
@@ -186,10 +198,10 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
             >
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <Text style={[styles.modalTitle, { color: colors.textMain }]}>
-                  Ustawienia samochodu
+                  Ustawienia aplikacji
                 </Text>
                 <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  Wprowadź nową nazwę samochodu. Przebieg odświeża się automatycznie z ostatniego tankowania.
+                  Dostosuj nazwę samochodu oraz opcjonalny własny klucz API Google Gemini.
                 </Text>
 
                 {errorMsg && (
@@ -218,10 +230,51 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
                   autoFocus
                 />
 
+                <Text style={[styles.label, { color: colors.textMuted, marginTop: 4 }]}>
+                  KLUCZ GEMINI API (OPCJONALNIE)
+                </Text>
+                <View
+                  style={[
+                    styles.apiKeyInputContainer,
+                    {
+                      backgroundColor: colors.bgCardSecondary,
+                      borderColor: colors.borderColor,
+                    },
+                  ]}
+                >
+                  <TextInput
+                    style={[
+                      styles.apiKeyInput,
+                      { color: colors.textMain },
+                    ]}
+                    value={apiKeyInput}
+                    onChangeText={setApiKeyInput}
+                    placeholder="Wklej swój klucz API Gemini (AI Studio)"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showApiKey}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeBtn}
+                    onPress={() => setShowApiKey(prev => !prev)}
+                    activeOpacity={0.7}
+                  >
+                    {showApiKey ? (
+                      <EyeOff size={20} color={colors.textMuted} />
+                    ) : (
+                      <Eye size={20} color={colors.textMuted} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+                  Jeśli podasz własny klucz, zostanie on użyty do analizy zdjęć przez AI.
+                </Text>
+
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={[styles.btnSave, { backgroundColor: colors.primary }]}
-                    onPress={handleSaveName}
+                    onPress={handleSaveSettings}
                     disabled={isSaving}
                     activeOpacity={0.8}
                   >
@@ -364,7 +417,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  apiKeyInputContainer: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    marginBottom: 6,
+  },
+  apiKeyInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  eyeBtn: {
+    padding: 6,
+    marginLeft: 6,
+  },
+  inputHint: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginBottom: 18,
   },
   errorBox: {
     backgroundColor: '#fef2f2',
