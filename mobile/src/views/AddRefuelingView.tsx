@@ -130,6 +130,22 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [aiCooldown, setAiCooldown] = useState<number>(0);
+
+  // Timer cooldownu dla ponowienia analizy AI
+  useEffect(() => {
+    if (aiCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setAiCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [aiCooldown]);
 
   const handleCostOrLitersChange = (newCost: string, newLiters: string) => {
     const numCost = parseFloat(newCost);
@@ -157,12 +173,15 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
     return `${fallbackPrefix}_${Date.now()}.${cleanExt}`;
   };
 
-  const checkDuplicateAsset = (asset: ImagePicker.ImagePickerAsset): string | null => {
+  const checkDuplicateAsset = (
+    asset: ImagePicker.ImagePickerAsset,
+    currentPhotos: MobileImageFile[] = photos
+  ): string | null => {
     const candidateName = extractDeviceFileName(asset);
     const candidateLower = candidateName.toLowerCase();
 
     // 1. Sprawdź duplikat na bieżącej liście wyboru
-    const inCurrent = photos.some(p => {
+    const inCurrent = currentPhotos.some(p => {
       const pName = (p.name || p.uri.split('/').pop() || '').toLowerCase();
       if (pName === candidateLower || p.uri === asset.uri) return true;
       if (
@@ -234,6 +253,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
     } catch (err: any) {
       console.error('Błąd podczas analizy AI:', err);
       setErrorMsg(err?.message || 'Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
+      setAiCooldown(5);
     } finally {
       setIsAnalyzing(false);
     }
@@ -261,7 +281,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
 
       if (useCamera) {
         const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           quality: 0.8,
         });
 
@@ -289,7 +309,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
       } else {
         const remainingLimit = 3 - photos.length;
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsMultipleSelection: true,
           selectionLimit: remainingLimit,
           quality: 0.8,
@@ -466,22 +486,22 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
             )}
           </View>
 
-          {/* Przycisk ręcznego uruchomienia analizy AI */}
-          {photos.length > 0 && (
+          {/* Przycisk ręcznego uruchomienia analizy AI - znika po udanej analizie */}
+          {!hasAnalyzedCurrentPhotos && photos.length > 0 && (
             <TouchableOpacity
               style={[
                 styles.analyzeAiBtn,
-                { backgroundColor: hasAnalyzedCurrentPhotos ? '#059669' : colors.accent },
-                (hasAnalyzedCurrentPhotos || isAnalyzing || isSubmitting) && { opacity: 0.8 },
+                { backgroundColor: aiCooldown > 0 ? '#6b7280' : colors.accent },
+                (isAnalyzing || isSubmitting || aiCooldown > 0) && { opacity: 0.8 },
               ]}
               onPress={() => processPhotosWithAI(photos)}
-              disabled={hasAnalyzedCurrentPhotos || isAnalyzing || isSubmitting}
+              disabled={isAnalyzing || isSubmitting || aiCooldown > 0}
               activeOpacity={0.8}
             >
-              {hasAnalyzedCurrentPhotos ? (
+              {aiCooldown > 0 ? (
                 <>
-                  <CheckCircle2 size={18} color="#ffffff" />
-                  <Text style={styles.analyzeAiBtnText}>✓ Zdjęcia zostały przeanalizowane</Text>
+                  <ActivityIndicator size="small" color="#ffffff" />
+                  <Text style={styles.analyzeAiBtnText}>Spróbuj ponownie za {aiCooldown}s...</Text>
                 </>
               ) : (
                 <>

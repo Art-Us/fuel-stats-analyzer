@@ -172,7 +172,11 @@ export const analyzePhotos = async (
     }
 
     const data = await response.json();
-    console.log(`[MOBILE LOG] ✅ Pomyślnie odebrano dane z AI:`, JSON.stringify(data));
+    if (skipAi) {
+      console.log(`[MOBILE LOG] 📤 Przesłano pliki zdjęć na serwer:`, JSON.stringify(data));
+    } else {
+      console.log(`[MOBILE LOG] ✅ Pomyślnie odebrano dane z AI:`, JSON.stringify(data));
+    }
     return data;
   } catch (err: any) {
     clearTimeout(timeoutId);

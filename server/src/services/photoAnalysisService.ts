@@ -57,16 +57,14 @@ export async function analyzeWithGemini(
     return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
   }
 
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+
   const pathsArray: string[] = Array.isArray(filePaths)
     ? filePaths
     : [filePaths].filter(Boolean) as string[];
 
-  try {
-    const geminiModel = process.env.GEMINI_MODEL || 'gemini-flash-latest';
-    console.log(`[Gemini API] ⚡ Rozpoczynam bezpośrednią analizę wizyjną dla ${pathsArray.length} zdjęć (model: ${geminiModel})...`);
-    const parts: any[] = [];
-
-    const prompt = `
+  const parts: any[] = [];
+  const prompt = `
 Jesteś precyzyjnym analitykiem wizyjnym danych dotyczących tankowania pojazdu.
 Przeanalizuj bezpośrednio dołączone zdjęcia (paragon, dystrybutor, licznik przebiegu z deski rozdzielczej) i wyciągnij z nich wartości numeryczne:
 - cost: łączna kwota do zapłaty w PLN (np. 185.50 lub 307.18)
@@ -84,23 +82,25 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
   "mileage": 0
 }
 `;
-    parts.push({ text: prompt });
+  parts.push({ text: prompt });
 
-    // Dołączenie przesłanych zdjęć w formacie Base64 bezpośrednio dla modelu wizyjnego Gemini Flash
-    for (const filePath of pathsArray) {
-      if (filePath && fs.existsSync(filePath)) {
-        const buffer = fs.readFileSync(filePath);
-        const ext = path.extname(filePath).toLowerCase();
-        const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
-        parts.push({
-          inlineData: {
-            mimeType,
-            data: buffer.toString('base64')
-          }
-        });
-      }
+  // Dołączenie przesłanych zdjęć w formacie Base64 bezpośrednio dla modelu wizyjnego Gemini Flash
+  for (const filePath of pathsArray) {
+    if (filePath && fs.existsSync(filePath)) {
+      const buffer = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+      parts.push({
+        inlineData: {
+          mimeType,
+          data: buffer.toString('base64')
+        }
+      });
     }
+  }
 
+  try {
+    console.log(`[Gemini API] ⚡ Rozpoczynam bezpośrednią analizę wizyjną dla ${pathsArray.length} zdjęć (model: ${geminiModel})...`);
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
 
     const response = await axios.post(
@@ -131,10 +131,15 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
   } catch (error: any) {
     const status = error?.response?.status;
     const errorDataStr = JSON.stringify(error?.response?.data || error?.message || '');
+    console.error(`[Gemini API Error] Model ${geminiModel} zwrócił błąd (${status}):`, errorDataStr);
 
-    console.error('[Gemini API Error] Błąd podczas analizy przez Gemini:', errorDataStr);
+    if (status === 503 || errorDataStr.includes('UNAVAILABLE') || errorDataStr.includes('high demand')) {
+      throw new AppError(
+        'Model AI Gemini jest w tej chwili przeciążony. Odczekaj chwilę i spróbuj ponownie.',
+        503
+      );
+    }
 
-    // Wykrywanie przekroczenia limitu zapytań Gemini API Free Tier (429 Rate Limit / Quota Exceeded)
     if (status === 429 || errorDataStr.includes('Quota exceeded') || errorDataStr.includes('RESOURCE_EXHAUSTED')) {
       const retryMatch = errorDataStr.match(/retry in ([0-9.]+)s/i);
       const retrySecs = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 60;
@@ -145,7 +150,10 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
       );
     }
 
-    return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
+    throw new AppError(
+      `Nie udało się przeanalizować zdjęć przez AI (${error?.message || 'Błąd serwera'}). Spróbuj ponownie.`,
+      400
+    );
   }
 }
 

@@ -17,9 +17,7 @@ database.sqlite
 *.sqlite3
 *.db
 
-# Uploads & Inputs directories
-uploads/*
-!uploads/.gitkeep
+# Inputs directory
 inputs/*
 !inputs/.gitkeep
 

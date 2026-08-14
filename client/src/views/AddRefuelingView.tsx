@@ -129,7 +129,7 @@ export const AddRefuelingView: React.FC = () => {
       setAiSuccessMsg('Dane ze zdjęć zostały automatycznie odczytane przez AI!');
     } catch (err: any) {
       console.error('Błąd podczas analizy AI:', err);
-      setErrorMsg('Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
+      setErrorMsg(err?.message || 'Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
     } finally {
       setIsAnalyzing(false);
     }

@@ -117,10 +117,12 @@ export function organizeRefuelingPhotos(
     return targetName;
   };
 
-  // Przenoszenie zdjęcia 1 (paragon/zdjęcie 1) z /uploads do /inputs/YYYY-MM-DD_HH-mm-ss/
-  if (receiptUrl && receiptUrl.startsWith('/uploads/')) {
+  // Przenoszenie zdjęcia 1 (paragon/zdjęcie 1) z /inputs/temp/ do /inputs/YYYY-MM-DD_HH-mm-ss/
+  if (receiptUrl && (receiptUrl.startsWith('/inputs/temp/') || receiptUrl.startsWith('/uploads/'))) {
     const rawFilename = path.basename(receiptUrl);
-    const oldPath = path.resolve(process.cwd(), 'uploads', rawFilename);
+    const tempPath = path.resolve(process.cwd(), 'inputs', 'temp', rawFilename);
+    const legacyPath = path.resolve(process.cwd(), 'uploads', rawFilename);
+    const oldPath = fs.existsSync(tempPath) ? tempPath : legacyPath;
     if (fs.existsSync(oldPath)) {
       const originalName = extractOriginalFilename(rawFilename);
       const targetFilename = getTargetFilename(originalName);
@@ -131,10 +133,12 @@ export function organizeRefuelingPhotos(
     }
   }
 
-  // Przenoszenie zdjęcia 2 (licznik/zdjęcie 2) z /uploads do /inputs/YYYY-MM-DD_HH-mm-ss/
-  if (dashboardUrl && dashboardUrl.startsWith('/uploads/')) {
+  // Przenoszenie zdjęcia 2 (licznik/zdjęcie 2) z /inputs/temp/ do /inputs/YYYY-MM-DD_HH-mm-ss/
+  if (dashboardUrl && (dashboardUrl.startsWith('/inputs/temp/') || dashboardUrl.startsWith('/uploads/'))) {
     const rawFilename = path.basename(dashboardUrl);
-    const oldPath = path.resolve(process.cwd(), 'uploads', rawFilename);
+    const tempPath = path.resolve(process.cwd(), 'inputs', 'temp', rawFilename);
+    const legacyPath = path.resolve(process.cwd(), 'uploads', rawFilename);
+    const oldPath = fs.existsSync(tempPath) ? tempPath : legacyPath;
     if (fs.existsSync(oldPath)) {
       const originalName = extractOriginalFilename(rawFilename);
       const targetFilename = getTargetFilename(originalName);
@@ -212,5 +216,67 @@ export function removePhotoFile(relativeUrl?: string | null): void {
     }
   } catch (err) {
     console.error(`[FILE ORGANIZER Error] Błąd podczas usuwania pliku ${relativeUrl}:`, err);
+  }
+}
+
+/**
+ * Sprawdza czy plik o podanej nazwie istnieje już w którymkolwiek podfolderze w inputs/
+ * z wyłączeniem folderu temp/ oraz ewentualnego folderu bieżącej edycji (excludeSubfolder).
+ */
+export function isPhotoDuplicateOnDisk(
+  filename: string,
+  excludeSubfolder?: string | null
+): { isDuplicate: boolean; foundInSubfolder?: string } {
+  const cleanCandidate = extractOriginalFilename(filename).toLowerCase();
+  const inputsBaseDir = path.resolve(process.cwd(), 'inputs');
+  if (!fs.existsSync(inputsBaseDir)) {
+    return { isDuplicate: false };
+  }
+
+  try {
+    const entries = fs.readdirSync(inputsBaseDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const subfolderName = entry.name;
+      // Wykluczamy folder temp oraz folder bieżącej edycji
+      if (subfolderName.toLowerCase() === 'temp') continue;
+      if (excludeSubfolder && subfolderName === excludeSubfolder) continue;
+
+      const subDirPath = path.join(inputsBaseDir, subfolderName);
+      try {
+        const files = fs.readdirSync(subDirPath);
+        for (const file of files) {
+          const fileClean = extractOriginalFilename(file).toLowerCase();
+          if (fileClean === cleanCandidate) {
+            return { isDuplicate: true, foundInSubfolder: subfolderName };
+          }
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  return { isDuplicate: false };
+}
+
+/**
+ * Czyści zawartość folderu inputs/temp/ usuwając wszystkie pliki tymczasowe.
+ */
+export function cleanTempFolder(): void {
+  try {
+    const tempDir = path.resolve(process.cwd(), 'inputs', 'temp');
+    if (fs.existsSync(tempDir)) {
+      const files = fs.readdirSync(tempDir);
+      for (const file of files) {
+        const filePath = path.join(tempDir, file);
+        try {
+          if (fs.statSync(filePath).isFile()) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (_) {}
+      }
+      console.log('[FILE ORGANIZER] 🧹 Wyczyszczono folder inputs/temp');
+    }
+  } catch (err) {
+    console.error('[FILE ORGANIZER Error] Błąd podczas czyszczenia folderu temp:', err);
   }
 }

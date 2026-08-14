@@ -167,6 +167,22 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [aiCooldown, setAiCooldown] = useState<number>(0);
+
+  // Timer cooldownu dla ponowienia analizy AI
+  useEffect(() => {
+    if (aiCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setAiCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [aiCooldown]);
 
   const getCleanDisplayName = (urlOrName?: string | null): string => {
     if (!urlOrName) return '';
@@ -199,21 +215,33 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
         setErrorMsg(null);
         const data = await getRefuelingById(id);
 
+        const initialReceipt = data.receipt_image_url || null;
+        let initialDashboard = data.dashboard_image_url || null;
+
+        // Zapobiegaj dublowaniu tego samego zdjęcia z bazy danych
+        if (initialReceipt && initialDashboard) {
+          const rClean = getCleanDisplayName(initialReceipt).toLowerCase();
+          const dClean = getCleanDisplayName(initialDashboard).toLowerCase();
+          if (rClean === dClean || initialReceipt === initialDashboard) {
+            initialDashboard = null;
+          }
+        }
+
         const formattedDate = new Date(data.date).toISOString().split('T')[0];
         setDate(formattedDate);
         setCost(data.cost ? data.cost.toString() : '');
         setLiters(data.liters ? data.liters.toString() : '');
         setPricePerLiter(data.price_per_liter ? data.price_per_liter.toString() : '');
         setMileage(data.mileage ? data.mileage.toString() : '');
-        setReceiptImageUrl(data.receipt_image_url || null);
-        setDashboardImageUrl(data.dashboard_image_url || null);
+        setReceiptImageUrl(initialReceipt);
+        setDashboardImageUrl(initialDashboard);
 
         const initialList: string[] = [];
-        if (data.receipt_image_url) {
-          initialList.push(getCleanDisplayName(data.receipt_image_url));
+        if (initialReceipt) {
+          initialList.push(getCleanDisplayName(initialReceipt));
         }
-        if (data.dashboard_image_url) {
-          initialList.push(getCleanDisplayName(data.dashboard_image_url));
+        if (initialDashboard) {
+          initialList.push(getCleanDisplayName(initialDashboard));
         }
         setInitialPhotoNames(initialList);
       } catch (err) {
@@ -276,16 +304,22 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
       if (result.receipt_image_url) setReceiptImageUrl(result.receipt_image_url);
       if (result.dashboard_image_url) setDashboardImageUrl(result.dashboard_image_url);
 
+      // Po zakończeniu analizy AI czyścimy lokalną listę photos, gdyż zdjęcia są teraz w receiptImageUrl / dashboardImageUrl
+      setPhotos([]);
       setHasAnalyzedCurrentPhotos(true);
     } catch (err: any) {
       console.error('Błąd analizy AI:', err);
       setErrorMsg(err?.message || 'Nie udało się przeanalizować zdjęć. Wprowadź dane ręcznie.');
+      setAiCooldown(5);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const checkDuplicateAsset = (asset: ImagePicker.ImagePickerAsset): string | null => {
+  const checkDuplicateAsset = (
+    asset: ImagePicker.ImagePickerAsset,
+    currentPhotos: MobileImageFile[] = photos
+  ): string | null => {
     const candidateName = extractDeviceFileName(asset);
     const candidateLower = candidateName.toLowerCase();
 
@@ -299,7 +333,7 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
     }
 
     // 2. Sprawdź z dołączonymi lokalnymi zdjęciami
-    for (const p of photos) {
+    for (const p of currentPhotos) {
       const pName = (p.name || getCleanDisplayName(p.uri)).toLowerCase();
       if (pName === candidateLower || p.uri === asset.uri) {
         return `Zdjęcie "${candidateName}" zostało już wybrane w formularzu.`;
@@ -347,7 +381,7 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
 
       if (useCamera) {
         const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           quality: 0.8,
         });
 
@@ -373,7 +407,7 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
         }
       } else {
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsMultipleSelection: true,
           selectionLimit: remainingLimit,
           quality: 0.8,
@@ -562,7 +596,13 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
 
         {/* Unified Multi-Photo Upload Area (1-3 photos) */}
         {(() => {
-          const totalPhotosCount = (receiptImageUrl ? 1 : 0) + (dashboardImageUrl ? 1 : 0) + photos.length;
+          const uniqueLocalPhotos = photos.filter(p => {
+            const pName = (p.name || getCleanDisplayName(p.uri)).toLowerCase();
+            const rName = getCleanDisplayName(receiptImageUrl).toLowerCase();
+            const dName = getCleanDisplayName(dashboardImageUrl).toLowerCase();
+            return pName !== rName && pName !== dName;
+          });
+          const totalPhotosCount = (receiptImageUrl ? 1 : 0) + (dashboardImageUrl ? 1 : 0) + uniqueLocalPhotos.length;
           const initialSorted = [...initialPhotoNames].sort().join(',');
           const currentSorted = getCurrentPhotoNames().sort().join(',');
           const hasPhotoSetChanged = initialSorted !== currentSorted;
@@ -656,7 +696,7 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
                 )}
 
                 {/* Newly added local photos */}
-                {photos.map((p, idx) => {
+                {uniqueLocalPhotos.map((p, idx) => {
                   const slotIdx = (receiptImageUrl ? 1 : 0) + (dashboardImageUrl ? 1 : 0) + idx + 1;
                   return (
                     <View key={idx} style={[styles.thumbnailWrapper, { borderColor: colors.accent }]}>
@@ -719,28 +759,28 @@ export const EditRefuelingView: React.FC<EditRefuelingViewProps> = ({
                   >
                     <Camera size={24} color={colors.primary} />
                     <Text style={[styles.addPhotoButtonText, { color: colors.primary }]}>
-                      {totalPhotosCount === 0 ? 'Dodaj zdjęcia (1-3)' : '+ Dodaj kolejne'}
+                      {totalPhotosCount === 0 ? 'Dodaj zdjęcia' : '+ Dodaj'}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* Przycisk ręcznego uruchomienia analizy AI - widoczny TYLKO przy zmianach zdjęć */}
-              {hasPhotoSetChanged && totalPhotosCount > 0 && (
+              {/* Przycisk ręcznego uruchomienia analizy AI - znika po udanej analizie */}
+              {hasPhotoSetChanged && totalPhotosCount > 0 && !hasAnalyzedCurrentPhotos && (
                 <TouchableOpacity
                   style={[
                     styles.analyzeAiBtn,
-                    { backgroundColor: hasAnalyzedCurrentPhotos ? '#059669' : colors.accent },
-                    (hasAnalyzedCurrentPhotos || isAnalyzing || isSubmitting) && { opacity: 0.8 },
+                    { backgroundColor: aiCooldown > 0 ? '#6b7280' : colors.accent },
+                    (isAnalyzing || isSubmitting || aiCooldown > 0) && { opacity: 0.8 },
                   ]}
                   onPress={() => processPhotosWithAI(photos)}
-                  disabled={hasAnalyzedCurrentPhotos || isAnalyzing || isSubmitting}
+                  disabled={isAnalyzing || isSubmitting || aiCooldown > 0}
                   activeOpacity={0.8}
                 >
-                  {hasAnalyzedCurrentPhotos ? (
+                  {aiCooldown > 0 ? (
                     <>
-                      <CheckCircle2 size={18} color="#ffffff" />
-                      <Text style={styles.analyzeAiBtnText}>✓ Zdjęcia zostały przeanalizowane</Text>
+                      <ActivityIndicator size="small" color="#ffffff" />
+                      <Text style={styles.analyzeAiBtnText}>Spróbuj ponownie za {aiCooldown}s...</Text>
                     </>
                   ) : (
                     <>

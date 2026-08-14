@@ -6,19 +6,28 @@ import { Refueling, CreateRefuelingDTO, UpdateRefuelingDTO, RefuelingWithStats }
 import { calculateRefuelingStats } from '../utils/calculations.js';
 import { getCalendarDateRange } from '../utils/calendarUtils.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { organizeRefuelingPhotos, removePhotoFile, extractOriginalFilename } from '../utils/fileOrganizer.js';
+import {
+  organizeRefuelingPhotos,
+  removePhotoFile,
+  extractOriginalFilename,
+  isPhotoDuplicateOnDisk,
+  cleanTempFolder
+} from '../utils/fileOrganizer.js';
 
 async function filterUniquePhotos(
   db: any,
   receiptUrl?: string | null,
   dashboardUrl?: string | null,
-  excludeId?: number
+  excludeId?: number,
+  excludeSubfolder?: string | null
 ): Promise<{ receipt_image_url: string | null; dashboard_image_url: string | null }> {
   let effectiveReceiptUrl = receiptUrl || null;
   let effectiveDashboardUrl = dashboardUrl || null;
 
-  const isDuplicateInDb = async (url: string): Promise<boolean> => {
+  const isDuplicatePhoto = async (url: string): Promise<boolean> => {
     const filename = extractOriginalFilename(path.basename(url));
+
+    // 1. Sprawdź w bazie danych
     const query = `
       SELECT id, date, receipt_image_url, dashboard_image_url
       FROM refuelings
@@ -40,17 +49,25 @@ async function filterUniquePhotos(
     const match = await db.get<Refueling>(query, params);
     if (match) {
       const matchDate = new Date(match.date).toISOString().split('T')[0];
-      console.warn(`[PHOTO DUPLICATE] ⚠️ Zdjęcie "${filename}" zostało pominięte (już wykorzystane w tankowaniu z ${matchDate}, ID: ${match.id}).`);
+      console.warn(`[PHOTO DUPLICATE] ⚠️ Zdjęcie "${filename}" zostało pominięte (już wykorzystane w bazie w tankowaniu z ${matchDate}, ID: ${match.id}).`);
       return true;
     }
+
+    // 2. Sprawdź na dysku we wszystkich folderach inputs/ z wyłączeniem inputs/temp/ oraz folderu bieżącej edycji
+    const diskCheck = isPhotoDuplicateOnDisk(filename, excludeSubfolder);
+    if (diskCheck.isDuplicate) {
+      console.warn(`[PHOTO DUPLICATE] ⚠️ Zdjęcie "${filename}" zostało pominięte (istnieje już plik na dysku w inputs/${diskCheck.foundInSubfolder}).`);
+      return true;
+    }
+
     return false;
   };
 
-  if (effectiveReceiptUrl && await isDuplicateInDb(effectiveReceiptUrl)) {
+  if (effectiveReceiptUrl && await isDuplicatePhoto(effectiveReceiptUrl)) {
     effectiveReceiptUrl = null;
   }
 
-  if (effectiveDashboardUrl && await isDuplicateInDb(effectiveDashboardUrl)) {
+  if (effectiveDashboardUrl && await isDuplicatePhoto(effectiveDashboardUrl)) {
     effectiveDashboardUrl = null;
   }
 
@@ -134,6 +151,9 @@ export async function createRefueling(
        LIMIT 1`,
       [newRefueling.date, newRefueling.date, newRefueling.id]
     );
+
+    // Czyszczenie tymczasowych plików z inputs/temp/ po udanym zapisie
+    cleanTempFolder();
 
     const stats = calculateRefuelingStats(newRefueling, previousRefueling || null);
 
@@ -276,9 +296,6 @@ export async function updateRefueling(
     const targetReceiptUrl = receipt_image_url !== undefined ? receipt_image_url : existing.receipt_image_url;
     const targetDashboardUrl = dashboard_image_url !== undefined ? dashboard_image_url : existing.dashboard_image_url;
 
-    // Filtrowanie duplikatów zdjęć (z wyłączeniem obecnego wpisu)
-    const filteredPhotos = await filterUniquePhotos(db, targetReceiptUrl, targetDashboardUrl, id);
-
     // Wyciągamy istniejący subfolder z istniejących URLi (np. /inputs/2026-08-06_1/...)
     let existingSubfolder: string | null = null;
     const sampleUrl = existing.receipt_image_url || existing.dashboard_image_url;
@@ -286,6 +303,9 @@ export async function updateRefueling(
       const parts = sampleUrl.split('/');
       if (parts[2]) existingSubfolder = parts[2];
     }
+
+    // Filtrowanie duplikatów zdjęć (z wyłączeniem obecnego wpisu i jego podfolderu)
+    const filteredPhotos = await filterUniquePhotos(db, targetReceiptUrl, targetDashboardUrl, id, existingSubfolder);
 
     const photoResult = organizeRefuelingPhotos(
       newDate,
@@ -304,6 +324,9 @@ export async function updateRefueling(
        WHERE id = ?`,
       [newDate, newCost, newLiters, newPricePerLiter, newMileage, photoResult.receipt_image_url, photoResult.dashboard_image_url, id]
     );
+
+    // Czyszczenie tymczasowych plików z inputs/temp/ po udanej aktualizacji
+    cleanTempFolder();
 
     const updated = await db.get<Refueling>('SELECT * FROM refuelings WHERE id = ?', [id]);
     if (!updated) {

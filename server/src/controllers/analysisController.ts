@@ -75,7 +75,7 @@ export async function analyzePhotosController(
     }
 
     const allImageUrls: string[] = [
-      ...uploadedFiles.map(f => `/uploads/${f.filename}`),
+      ...uploadedFiles.map(f => `/inputs/temp/${f.filename}`),
       ...existingUrls
     ].slice(0, 3);
 

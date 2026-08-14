@@ -1,18 +1,23 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { analyzePhotosController } from '../controllers/analysisController.js';
 import { sanitizeFilename } from '../utils/fileOrganizer.js';
 
 const router = Router();
 
-// Konfiguracja dyskowego zapisu plików w folderze uploads/ z zachowaniem oryginalnej nazwy
+// Konfiguracja dyskowego zapisu plików w folderze inputs/temp/ z zachowaniem oryginalnej nazwy
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, path.resolve(process.cwd(), 'uploads'));
+    const tempDir = path.resolve(process.cwd(), 'inputs', 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    cb(null, tempDir);
   },
   filename: (_req, file, cb) => {
-    let originalName = file.originalname;
+    let originalName = file.originalname || 'photo.jpg';
     try {
       // Prawidłowe dekodowanie polskich znaków jeśli nagłówek nadszedł jako latin1
       originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');

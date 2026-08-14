@@ -88,14 +88,25 @@ export const EditRefuelingView: React.FC = () => {
         setErrorMsg(null);
         const data = await getRefuelingById(Number(id));
 
+        const initialReceipt = data.receipt_image_url || null;
+        let initialDashboard = data.dashboard_image_url || null;
+
+        if (initialReceipt && initialDashboard) {
+          const rClean = getCleanDisplayName(initialReceipt).toLowerCase();
+          const dClean = getCleanDisplayName(initialDashboard).toLowerCase();
+          if (rClean === dClean || initialReceipt === initialDashboard) {
+            initialDashboard = null;
+          }
+        }
+
         const formattedDate = new Date(data.date).toISOString().split('T')[0];
         setDate(formattedDate);
         setCost(data.cost ? data.cost.toString() : '');
         setLiters(data.liters ? data.liters.toString() : '');
         setPricePerLiter(data.price_per_liter ? data.price_per_liter.toString() : '');
         setMileage(data.mileage ? data.mileage.toString() : '');
-        setReceiptImageUrl(data.receipt_image_url || null);
-        setDashboardImageUrl(data.dashboard_image_url || null);
+        setReceiptImageUrl(initialReceipt);
+        setDashboardImageUrl(initialDashboard);
 
         const allList = await getRefuelings('all');
         const map = new Map<string, { date: string; id: number }>();
@@ -163,7 +174,7 @@ export const EditRefuelingView: React.FC = () => {
       setSuccessMsg('Dane zostały zaktualizowane ze zdjęć przez AI!');
     } catch (err: any) {
       console.error('Błąd analizy AI:', err);
-      setErrorMsg('Nie udało się przeanalizować zdjęć. Wprowadź dane ręcznie.');
+      setErrorMsg(err?.message || 'Nie udało się przeanalizować zdjęć. Wprowadź dane ręcznie.');
     } finally {
       setIsAnalyzing(false);
     }

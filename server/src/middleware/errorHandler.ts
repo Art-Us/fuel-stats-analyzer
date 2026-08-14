@@ -20,16 +20,18 @@ export function errorHandler(
 ): void {
   console.error('[Error]', err);
 
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
+  const isAppError = err instanceof AppError || (err && typeof (err as any).statusCode === 'number');
+  if (isAppError) {
+    const statusCode = (err as any).statusCode || 400;
+    res.status(statusCode).json({
       error: err.message,
-      ...(err.details ? { details: err.details } : {})
+      ...((err as any).details ? { details: (err as any).details } : {})
     });
     return;
   }
 
   res.status(500).json({
-    error: 'Internal Server Error',
+    error: err.message || 'Wystąpił nieoczekiwany błąd po stronie serwera.',
     message: err.message || 'Wystąpił nieoczekiwany błąd po stronie serwera.'
   });
 }
