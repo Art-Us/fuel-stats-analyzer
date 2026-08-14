@@ -26,7 +26,7 @@ A modern, full-stack vehicle fuel and expense tracking platform. Includes an **A
   - Restores car name and inserts refuelings into SQLite.
   - **Smart Duplicate Prevention**: Skips already existing records to prevent data duplication.
 
-### 🖼️ Smart File Organization & Duplicate Photo Prevention
+### 🖼️ File Organization & Duplicate Photo Prevention
 - **Structured Storage**: Photos organized into date-based subdirectories (`inputs/YYYY-MM-DD_HH-MM-SS/`).
 - **SHA-256 Hash Verification**: Deep scan across all folders in `inputs/` prevents saving duplicate photos across refuelings or within the same refueling.
 - **Automated Temp Cleanup**: `inputs/temp/` is automatically purged upon successful creation or update of refuelings.
@@ -36,7 +36,7 @@ A modern, full-stack vehicle fuel and expense tracking platform. Includes an **A
 - **Calendar Drill-down**: Detailed calendar breakdown by year, month, or specific week (`/calendar` endpoints).
 - **Key Metrics**: Average consumption ($L/100\text{ km}$), cost per km, total expenses, total fuel, total mileage, and expense distributions.
 
-### 🌓 Premium UI & Dark Mode
+### 🌓 Dark Mode
 - **Animated Theme Switching**: Circular reveal theme transition animation (Dark / Light mode).
 - **Responsive Web & Mobile**: Glassmorphic styling, intuitive forms, and interactive charts (Recharts on web, native components on mobile).
 
