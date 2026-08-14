@@ -213,7 +213,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
                   }}
                   title="Pobierz kopię zapasową w archiwum ZIP"
                 >
-                  <Download size={14} />
+                  <Upload size={14} />
                   <span>Eksport</span>
                 </a>
 
@@ -244,7 +244,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
                   }}
                   title="Wczytaj kopię zapasową z pliku ZIP"
                 >
-                  <Upload size={14} />
+                  <Download size={14} />
                   <span>{isImporting ? 'Import...' : 'Import'}</span>
                 </button>
               </div>
