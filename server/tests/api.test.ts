@@ -4,6 +4,7 @@ import express from 'express';
 import refuelingsRouter from '../src/routes/refuelings.js';
 import statsRouter from '../src/routes/stats.js';
 import carRouter from '../src/routes/car.js';
+import backupRouter from '../src/routes/backup.js';
 import { errorHandler } from '../src/middleware/errorHandler.js';
 import { getDatabase } from '../src/db.js';
 import { removePhotoFile } from '../src/utils/fileOrganizer.js';
@@ -13,6 +14,7 @@ app.use(express.json());
 app.use('/api/refuelings', refuelingsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/car', carRouter);
+app.use('/api/backup', backupRouter);
 app.use(errorHandler);
 
 describe('API Refuelings & Stats Endpoints', () => {
@@ -213,5 +215,29 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(getRes.status).toBe(200);
     expect(getRes.body.name).toBe('Testowa Skoda Octavia');
     expect(getRes.body.gemini_api_key).toBe('AIzaSy_TEST_KEY_123');
+  });
+
+  it('GET /api/backup/export powinien wygenerować archiwum ZIP z nagłówkami', async () => {
+    const res = await request(app).get('/api/backup/export');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/zip');
+    expect(res.headers['content-disposition']).toContain('attachment; filename="fuel_app_backup_');
+  });
+
+  it('POST /api/backup/import powinien pomyślnie zaimportować bazę z pliku ZIP', async () => {
+    // 1. Pobieramy eksport ZIP
+    const exportRes = await request(app)
+      .get('/api/backup/export')
+      .responseType('blob');
+
+    expect(exportRes.status).toBe(200);
+
+    // 2. Importujemy pobrany plik ZIP
+    const importRes = await request(app)
+      .post('/api/backup/import')
+      .attach('backup', exportRes.body, 'test_backup.zip');
+
+    expect(importRes.status).toBe(200);
+    expect(importRes.body.message).toContain('pomyślnie');
   });
 });

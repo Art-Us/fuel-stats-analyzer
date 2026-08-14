@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff } from 'lucide-react';
-import { getCarInfo, updateCarInfo } from '../services/api';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Download, Upload, CheckCircle2 } from 'lucide-react';
+import { getCarInfo, updateCarInfo, getExportBackupUrl, importBackup } from '../services/api';
 
 interface HeaderProps {
   title?: string;
@@ -42,7 +42,11 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
   const [apiKeyInput, setApiKeyInput] = useState<string>('');
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchCarData = async () => {
     try {
@@ -76,6 +80,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
     setApiKeyInput(geminiApiKey);
     setShowApiKey(false);
     setErrorMsg(null);
+    setSuccessMsg(null);
     setIsSettingsOpen(true);
   };
 
@@ -88,6 +93,30 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
     }, 200);
   };
 
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+
+      const result = await importBackup(file);
+      setSuccessMsg(`Pomyślnie zaimportowano ${result.imported_refuelings} tankowań!`);
+      await fetchCarData();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } catch (err: any) {
+      console.error('Błąd podczas importu archiwum ZIP:', err);
+      setErrorMsg(err?.response?.data?.error || err?.message || 'Nie udało się zaimportować pliku ZIP.');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameInput.trim()) {
@@ -98,6 +127,7 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
     try {
       setIsSaving(true);
       setErrorMsg(null);
+      setSuccessMsg(null);
       const updated = await updateCarInfo(nameInput.trim(), apiKeyInput.trim());
       setCarName(updated.name);
       setLatestMileage(updated.latest_mileage);
@@ -159,17 +189,81 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Statystyki Paliwa' }) =
             className={`modal-sheet ${isClosingModal ? 'closing' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-              Ustawienia aplikacji
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                Ustawienia aplikacji
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <a
+                  href={getExportBackupUrl()}
+                  download
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-card-secondary)',
+                    color: 'var(--color-primary)',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                  }}
+                  title="Pobierz kopię zapasową w archiwum ZIP"
+                >
+                  <Download size={14} />
+                  <span>Eksport</span>
+                </a>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".zip,application/zip,application/x-zip-compressed"
+                  style={{ display: 'none' }}
+                  onChange={handleFileImport}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-card-secondary)',
+                    color: '#16a34a',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Wczytaj kopię zapasową z pliku ZIP"
+                >
+                  <Upload size={14} />
+                  <span>{isImporting ? 'Import...' : 'Import'}</span>
+                </button>
+              </div>
+            </div>
             <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Dostosuj nazwę samochodu oraz opcjonalny własny klucz API Google Gemini.
+              Dostosuj dane pojazdu, klucz API lub wykonaj kopię zapasową / import danych.
             </p>
 
             {errorMsg && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 14px', color: '#991b1b', marginBottom: '16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertCircle size={16} />
                 <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', color: '#16a34a', marginBottom: '16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={16} />
+                <span>{successMsg}</span>
               </div>
             )}
 

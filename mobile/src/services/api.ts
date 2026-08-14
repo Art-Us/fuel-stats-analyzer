@@ -240,4 +240,41 @@ export const updateCarInfo = async (name: string, gemini_api_key?: string): Prom
   return response.data;
 };
 
+export const getExportBackupUrl = (): string => `${API_BASE_URL}/backup/export`;
+
+export interface ImportBackupResponse {
+  message: string;
+  imported_refuelings: number;
+  total_in_backup: number;
+  car_name: string | null;
+}
+
+export const importBackup = async (file: { uri: string; name?: string; type?: string }): Promise<ImportBackupResponse> => {
+  const formData = new FormData();
+  formData.append('backup', {
+    uri: file.uri,
+    name: file.name || 'backup.zip',
+    type: file.type || 'application/zip',
+  } as any);
+
+  const response = await fetch(`${API_BASE_URL}/backup/import`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    let errMessage = 'Błąd podczas importu pliku ZIP';
+    try {
+      const errJson = await response.json();
+      if (errJson?.error) errMessage = errJson.error;
+    } catch (_) {}
+    throw new Error(errMessage);
+  }
+
+  return await response.json();
+};
+
 export default api;

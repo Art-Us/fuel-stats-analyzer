@@ -11,11 +11,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Linking,
 } from 'react-native';
-import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Key } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import { Fuel, Settings, Save, AlertCircle, Sun, Moon, Eye, EyeOff, Key, Download, Upload, CheckCircle2 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useViewControl } from '../context/ViewControlContext';
-import { getCarInfo, updateCarInfo } from '../services/api';
+import { getCarInfo, updateCarInfo, getExportBackupUrl, importBackup } from '../services/api';
 
 interface TopNavBarProps {
   title?: string;
@@ -51,7 +53,7 @@ interface VehicleCardProps {
 
 export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) => {
   const { colors } = useTheme();
-  const { cachedCarInfo, setCachedCarInfo } = useViewControl();
+  const { cachedCarInfo, setCachedCarInfo, setCachedHistory, setCachedStats, setCachedStatsHistory } = useViewControl();
 
   const [carName, setCarName] = useState<string>(cachedCarInfo?.name || 'Mój Samochód');
   const [latestMileage, setLatestMileage] = useState<number | null>(cachedCarInfo?.latest_mileage ?? null);
@@ -61,7 +63,10 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
   const [apiKeyInput, setApiKeyInput] = useState<string>(cachedCarInfo?.gemini_api_key || '');
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const slideAnim = useRef(new Animated.Value(450)).current;
 
@@ -116,7 +121,58 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
     setApiKeyInput(cachedCarInfo?.gemini_api_key || '');
     setShowApiKey(false);
     setErrorMsg(null);
+    setSuccessMsg(null);
     setIsSettingsOpen(true);
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      setIsExporting(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const url = getExportBackupUrl();
+      await Linking.openURL(url);
+    } catch (err) {
+      console.error('Błąd podczas otwierania eksportu ZIP:', err);
+      setErrorMsg('Nie udało się pobrać pliku eksportu.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportBackup = async () => {
+    try {
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/zip', 'application/x-zip-compressed', '*/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (res.canceled || !res.assets || res.assets.length === 0) {
+        return;
+      }
+
+      const fileAsset = res.assets[0];
+      setIsImporting(true);
+
+      const result = await importBackup({
+        uri: fileAsset.uri,
+        name: fileAsset.name,
+        type: fileAsset.mimeType || 'application/zip',
+      });
+
+      setSuccessMsg(`Pomyślnie zaimportowano ${result.imported_refuelings} tankowań!`);
+      await fetchCarData();
+      setCachedHistory([]);
+      setCachedStats(null);
+      setCachedStatsHistory([]);
+    } catch (err: any) {
+      console.error('Błąd podczas importu archiwum ZIP:', err);
+      setErrorMsg(err?.message || 'Nie udało się zaimportować pliku ZIP.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -128,6 +184,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
     try {
       setIsSaving(true);
       setErrorMsg(null);
+      setSuccessMsg(null);
       const updated = await updateCarInfo(nameInput.trim(), apiKeyInput.trim());
       setCarName(updated.name);
       setLatestMileage(updated.latest_mileage);
@@ -197,17 +254,74 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
               ]}
             >
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <Text style={[styles.modalTitle, { color: colors.textMain }]}>
-                  Ustawienia aplikacji
-                </Text>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={[styles.modalTitle, { color: colors.textMain }]}>
+                    Ustawienia aplikacji
+                  </Text>
+                  <View style={styles.backupButtonsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.backupBtn,
+                        {
+                          backgroundColor: colors.bgCardSecondary,
+                          borderColor: colors.borderColor,
+                        },
+                      ]}
+                      onPress={handleExportBackup}
+                      disabled={isExporting || isImporting}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Eksportuj kopię zapasową (ZIP)"
+                    >
+                      {isExporting ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <>
+                          <Download size={14} color={colors.primary} />
+                          <Text style={[styles.backupBtnText, { color: colors.primary }]}>Eksport</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.backupBtn,
+                        {
+                          backgroundColor: colors.bgCardSecondary,
+                          borderColor: colors.borderColor,
+                        },
+                      ]}
+                      onPress={handleImportBackup}
+                      disabled={isExporting || isImporting}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Importuj kopię zapasową (ZIP)"
+                    >
+                      {isImporting ? (
+                        <ActivityIndicator size="small" color="#16a34a" />
+                      ) : (
+                        <>
+                          <Upload size={14} color="#16a34a" />
+                          <Text style={[styles.backupBtnText, { color: '#16a34a' }]}>Import</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  Dostosuj nazwę samochodu oraz opcjonalny własny klucz API Google Gemini.
+                  Dostosuj dane pojazdu, klucz API lub wykonaj kopię zapasową / import danych.
                 </Text>
 
                 {errorMsg && (
                   <View style={styles.errorBox}>
                     <AlertCircle size={16} color="#991b1b" />
                     <Text style={styles.errorText}>{errorMsg}</Text>
+                  </View>
+                )}
+
+                {successMsg && (
+                  <View style={styles.successBox}>
+                    <CheckCircle2 size={16} color="#16a34a" />
+                    <Text style={styles.successText}>{successMsg}</Text>
                   </View>
                 )}
 
@@ -394,15 +508,56 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
   },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    flex: 1,
+  },
+  backupButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  backupBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   modalSub: {
     fontSize: 13,
     marginBottom: 16,
     lineHeight: 18,
+  },
+  successBox: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  successText: {
+    color: '#16a34a',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   label: {
     fontSize: 12,
