@@ -5,6 +5,7 @@ import {
   getRefuelingById,
   updateRefueling,
   deleteRefueling,
+  deleteRefuelingPhotoController,
   getCalendarRefuelings
 } from '../controllers/refuelingsController.js';
 
@@ -282,5 +283,6 @@ router.get('/calendar', getCalendarRefuelings);
 router.get('/:id', getRefuelingById);
 router.put('/:id', updateRefueling);
 router.delete('/:id', deleteRefueling);
+router.delete('/:id/images/:type', deleteRefuelingPhotoController);
 
 export default router;

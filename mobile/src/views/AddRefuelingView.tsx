@@ -12,6 +12,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Image,
+  Dimensions,
 } from 'react-native';
 import {
   Camera,
@@ -24,14 +26,25 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
+  X,
+  Plus,
+  Trash2,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { useScroll } from '../context/ScrollContext';
-import { analyzePhotos, createRefueling, MobileImageFile } from '../services/api';
+import { analyzePhotos, createRefueling, MobileImageFile, uploadPhotosFast, getRefuelings } from '../services/api';
 
 import { DatePickerModal } from '../components/DatePickerModal';
 import { VehicleCard } from '../components/Header';
+
+// Stałe siatki zdjęć: 3 równe sloty na pełną szerokość
+const GRID_GAP = 8;
+const PHOTO_SLOT_W = Math.floor(
+  (Dimensions.get('window').width - 40 - 2 * GRID_GAP) / 3
+);
+// Szerokość przycisku dodawania przy N wolnych slotach
+const addBtnW = (n: number) => PHOTO_SLOT_W * n + GRID_GAP * (n - 1);
 
 interface AddRefuelingViewProps {
   onSuccess: () => void;
@@ -52,10 +65,36 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
   const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
   const [dashboardImageUrl, setDashboardImageUrl] = useState<string | null>(null);
 
-  // Photos & Modals
-  const [receiptFile, setReceiptFile] = useState<MobileImageFile | null>(null);
-  const [dashboardFile, setDashboardFile] = useState<MobileImageFile | null>(null);
-  const [activePhotoModal, setActivePhotoModal] = useState<'receipt' | 'dashboard' | null>(null);
+  // Photos & Multi-Photo Upload state (1 to 3 photos)
+  const [photos, setPhotos] = useState<MobileImageFile[]>([]);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState<boolean>(false);
+  const [hasAnalyzedCurrentPhotos, setHasAnalyzedCurrentPhotos] = useState<boolean>(false);
+  const [existingPhotosMap, setExistingPhotosMap] = useState<Map<string, { date: string; id: number }>>(new Map());
+
+  // Pobranie listy istniejących tankowań aby weryfikować unikalność zdjęć
+  useEffect(() => {
+    const loadExistingPhotos = async () => {
+      try {
+        const list = await getRefuelings('all');
+        const map = new Map<string, { date: string; id: number }>();
+        list.forEach(r => {
+          const rDate = new Date(r.date).toISOString().split('T')[0];
+          if (r.receipt_image_url) {
+            const raw = r.receipt_image_url.split('/').pop() || '';
+            const clean = raw.includes('___') ? raw.split('___').slice(1).join('___') : raw;
+            if (clean) map.set(clean.toLowerCase(), { date: rDate, id: r.id });
+          }
+          if (r.dashboard_image_url) {
+            const raw = r.dashboard_image_url.split('/').pop() || '';
+            const clean = raw.includes('___') ? raw.split('___').slice(1).join('___') : raw;
+            if (clean) map.set(clean.toLowerCase(), { date: rDate, id: r.id });
+          }
+        });
+        setExistingPhotosMap(map);
+      } catch (_) {}
+    };
+    loadExistingPhotos();
+  }, [carRefreshTrigger]);
 
   const photoSlideAnim = useRef(new Animated.Value(450)).current;
 
@@ -71,12 +110,12 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
       useNativeDriver: true,
     }).start(() => {
       if (callback) callback();
-      setActivePhotoModal(null);
+      setIsPhotoModalOpen(false);
     });
   };
 
   useEffect(() => {
-    if (activePhotoModal != null) {
+    if (isPhotoModalOpen) {
       photoSlideAnim.setValue(450);
       Animated.timing(photoSlideAnim, {
         toValue: 0,
@@ -84,7 +123,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
         useNativeDriver: true,
       }).start();
     }
-  }, [activePhotoModal]);
+  }, [isPhotoModalOpen]);
 
   // Loading & Error States
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -100,18 +139,66 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
     }
   };
 
-  const processPhotosWithAI = async (
-    rFile: MobileImageFile | null,
-    dFile: MobileImageFile | null
-  ) => {
-    if (!rFile && !dFile) return;
+  const extractDeviceFileName = (asset: ImagePicker.ImagePickerAsset, fallbackPrefix = 'photo'): string => {
+    if (asset.fileName && asset.fileName.trim().length > 0) {
+      return asset.fileName.trim();
+    }
+    const uriParts = asset.uri.split('/');
+    const lastPart = uriParts[uriParts.length - 1];
+    if (lastPart && lastPart.includes('.')) {
+      try {
+        return decodeURIComponent(lastPart.split('?')[0]);
+      } catch (_) {
+        return lastPart.split('?')[0];
+      }
+    }
+    const ext = asset.mimeType?.split('/')[1] || 'jpg';
+    const cleanExt = ext === 'jpeg' ? 'jpg' : ext;
+    return `${fallbackPrefix}_${Date.now()}.${cleanExt}`;
+  };
+
+  const checkDuplicateAsset = (asset: ImagePicker.ImagePickerAsset): string | null => {
+    const candidateName = extractDeviceFileName(asset);
+    const candidateLower = candidateName.toLowerCase();
+
+    // 1. Sprawdź duplikat na bieżącej liście wyboru
+    const inCurrent = photos.some(p => {
+      const pName = (p.name || p.uri.split('/').pop() || '').toLowerCase();
+      if (pName === candidateLower || p.uri === asset.uri) return true;
+      if (
+        asset.fileSize &&
+        p.fileSize &&
+        asset.fileSize === p.fileSize &&
+        asset.width === p.width &&
+        asset.height === p.height
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (inCurrent) {
+      return `Zdjęcie "${candidateName}" zostało już wcześniej wybrane w tym formularzu.`;
+    }
+
+    // 2. Sprawdź duplikat w istniejących tankowaniach w bazie
+    const inDb = existingPhotosMap.get(candidateLower);
+    if (inDb) {
+      return `Zdjęcie "${candidateName}" zostało już wcześniej wykorzystane w tankowaniu z dnia ${inDb.date} (ID: ${inDb.id}) i nie zostało dołączone.`;
+    }
+
+    return null;
+  };
+
+  const processPhotosWithAI = async (photoList: MobileImageFile[]) => {
+    if (photoList.length === 0) return;
 
     try {
       setIsAnalyzing(true);
       setErrorMsg(null);
       setAiSuccessMsg(null);
 
-      const result = await analyzePhotos(rFile, dFile);
+      const result = await analyzePhotos(photoList);
 
       if (result.date) {
         try {
@@ -119,20 +206,20 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
           if (!isNaN(parsedD.getTime())) {
             setDate(parsedD.toISOString().split('T')[0]);
           }
-        } catch (_) {}
+        } catch (_) { }
       }
-      if (result.cost != null) {
+      if (result.cost != null && result.cost > 0) {
         setCost(result.cost.toString());
       }
-      if (result.liters != null) {
+      if (result.liters != null && result.liters > 0) {
         setLiters(result.liters.toString());
       }
-      if (result.price_per_liter != null) {
+      if (result.price_per_liter != null && result.price_per_liter > 0) {
         setPricePerLiter(result.price_per_liter.toString());
       } else if (result.cost != null && result.liters != null && result.liters > 0) {
         setPricePerLiter((result.cost / result.liters).toFixed(2));
       }
-      if (result.mileage != null) {
+      if (result.mileage != null && result.mileage > 0) {
         setMileage(result.mileage.toString());
       }
       if (result.receipt_image_url) {
@@ -142,16 +229,19 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
         setDashboardImageUrl(result.dashboard_image_url);
       }
 
-      setAiSuccessMsg('Dane ze zdjęć zostały automatycznie odczytane przez AI!');
+      setHasAnalyzedCurrentPhotos(true);
+      setAiSuccessMsg(`Dane ze zdjęć (${photoList.length}) zostały automatycznie odczytane przez AI!`);
     } catch (err: any) {
       console.error('Błąd podczas analizy AI:', err);
-      setErrorMsg(`Nie udało się przeanalizować zdjęć (${err?.message || 'Błąd połączenia'}). Uzupełnij dane ręcznie.`);
+      setErrorMsg(err?.message || 'Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const pickImage = async (target: 'receipt' | 'dashboard', useCamera: boolean) => {
+  const pickImage = async (useCamera: boolean) => {
+    if (photos.length >= 3) return;
+
     try {
       let permissionResult;
       if (useCamera) {
@@ -169,37 +259,94 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
         return;
       }
 
-      const result = useCamera
-        ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.8,
-        })
-        : await ImagePicker.launchImageLibraryAsync({
+      if (useCamera) {
+        const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
         });
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        const fileObj: MobileImageFile = {
-          uri: asset.uri,
-          name: asset.fileName || `${target}_${Date.now()}.jpg`,
-          type: asset.mimeType || 'image/jpeg',
-        };
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const asset = result.assets[0];
+          const duplicateErr = checkDuplicateAsset(asset);
+          if (duplicateErr) {
+            setErrorMsg(duplicateErr);
+            return;
+          }
 
-        if (target === 'receipt') {
-          setReceiptFile(fileObj);
-          processPhotosWithAI(fileObj, dashboardFile);
-        } else {
-          setDashboardFile(fileObj);
-          processPhotosWithAI(receiptFile, fileObj);
+          const photoName = extractDeviceFileName(asset, 'camera');
+          const newPhoto: MobileImageFile = {
+            uri: asset.uri,
+            name: photoName,
+            type: asset.mimeType || 'image/jpeg',
+            fileSize: asset.fileSize,
+            width: asset.width,
+            height: asset.height,
+          };
+          const updated = [...photos, newPhoto].slice(0, 3);
+          setPhotos(updated);
+          setHasAnalyzedCurrentPhotos(false);
+        }
+      } else {
+        const remainingLimit = 3 - photos.length;
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsMultipleSelection: true,
+          selectionLimit: remainingLimit,
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const duplicates: string[] = [];
+          const validAssets: ImagePicker.ImagePickerAsset[] = [];
+          const currentCombined = [...photos];
+
+          for (const asset of result.assets) {
+            const dupErr = checkDuplicateAsset(asset, currentCombined);
+            if (dupErr) {
+              duplicates.push(dupErr);
+            } else {
+              validAssets.push(asset);
+              currentCombined.push({
+                uri: asset.uri,
+                name: extractDeviceFileName(asset),
+                type: asset.mimeType || 'image/jpeg',
+                fileSize: asset.fileSize,
+                width: asset.width,
+                height: asset.height,
+              });
+            }
+          }
+
+          if (duplicates.length > 0) {
+            setErrorMsg(duplicates.join('\n'));
+            if (validAssets.length === 0) return;
+          }
+
+          const newFiles: MobileImageFile[] = validAssets.map((asset, idx) => ({
+            uri: asset.uri,
+            name: extractDeviceFileName(asset, `gallery_${idx + 1}`),
+            type: asset.mimeType || 'image/jpeg',
+            fileSize: asset.fileSize,
+            width: asset.width,
+            height: asset.height,
+          }));
+          const updated = [...photos, ...newFiles].slice(0, 3);
+          setPhotos(updated);
+          setHasAnalyzedCurrentPhotos(false);
         }
       }
     } catch (err) {
       console.error('Błąd wyboru zdjęcia:', err);
     } finally {
-      setActivePhotoModal(null);
+      handleClosePhotoModal();
     }
+  };
+
+  const removePhoto = (index: number) => {
+    if (isAnalyzing) return;
+    const updated = photos.filter((_, i) => i !== index);
+    setPhotos(updated);
+    setHasAnalyzedCurrentPhotos(false);
   };
 
   const handleSubmit = async () => {
@@ -217,20 +364,36 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
 
     try {
       setIsSubmitting(true);
+      let finalReceiptUrl = receiptImageUrl;
+      let finalDashboardUrl = dashboardImageUrl;
+
+      // Pominięcie ewentualnych duplikatów ze zdjęć przed wysłaniem
+      const uniquePhotosToUpload = photos.filter(p => {
+        const pName = (p.name || p.uri.split('/').pop() || '').toLowerCase();
+        return !existingPhotosMap.has(pName);
+      });
+
+      // Jeśli dołączono zdjęcia lokalne, przesłanie unikalnych plików
+      if (uniquePhotosToUpload.length > 0) {
+        const uploadRes = await uploadPhotosFast(uniquePhotosToUpload);
+        if (uploadRes.receipt_image_url) finalReceiptUrl = uploadRes.receipt_image_url;
+        if (uploadRes.dashboard_image_url) finalDashboardUrl = uploadRes.dashboard_image_url;
+      }
+
       await createRefueling({
         date: new Date(date).toISOString(),
         cost: numCost,
         liters: numLiters,
         price_per_liter: !isNaN(numPrice) ? numPrice : numCost / numLiters,
         mileage: numMileage,
-        receipt_image_url: receiptImageUrl,
-        dashboard_image_url: dashboardImageUrl,
+        receipt_image_url: finalReceiptUrl,
+        dashboard_image_url: finalDashboardUrl,
       });
 
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Błąd zapisu tankowania:', err);
-      setErrorMsg('Nie udało się zapisać tankowania. Sprawdź poprawność danych.');
+      setErrorMsg(err?.message || 'Nie udało się zapisać tankowania. Sprawdź poprawność danych.');
     } finally {
       setIsSubmitting(false);
     }
@@ -251,43 +414,83 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
         <VehicleCard refreshTrigger={carRefreshTrigger} />
         <Text style={[styles.title, { color: colors.textMain }]}>Dodaj nowe tankowanie</Text>
 
-        {/* Photo Buttons Grid */}
-        <View style={styles.photoGrid}>
-          <TouchableOpacity
-            style={[
-              styles.photoBtn,
-              {
-                backgroundColor: colors.bgCardSecondary,
-                borderColor: colors.accent,
-              },
-            ]}
-            onPress={() => setActivePhotoModal('receipt')}
-            disabled={isAnalyzing || isSubmitting}
-            activeOpacity={0.8}
-          >
-            <Camera size={24} color={colors.primary} />
-            <Text style={[styles.photoBtnText, { color: colors.primary }]}>
-              {receiptFile ? '✓ Paragon dodany' : 'Zdjęcie: Paragon'}
-            </Text>
-          </TouchableOpacity>
+        {/* Unified Multi-Photo Upload Area (1-3 photos) */}
+        <View style={styles.multiPhotoSection}>
+          <View style={styles.multiPhotoHeader}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>ZDJĘCIA (MAX 3: PARAGON / DYSTRYBUTOR / LICZNIK)</Text>
+            <Text style={[styles.photoCounterBadge, { color: colors.primary }]}>{photos.length}/3</Text>
+          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.photoBtn,
-              {
-                backgroundColor: colors.bgCardSecondary,
-                borderColor: colors.accent,
-              },
-            ]}
-            onPress={() => setActivePhotoModal('dashboard')}
-            disabled={isAnalyzing || isSubmitting}
-            activeOpacity={0.8}
-          >
-            <Camera size={24} color={colors.primary} />
-            <Text style={[styles.photoBtnText, { color: colors.primary }]}>
-              {dashboardFile ? '✓ Licznik dodany' : 'Zdjęcie: Licznik'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.thumbnailsContainer}>
+            {photos.map((p, idx) => (
+              <View key={idx} style={[styles.thumbnailWrapper, { borderColor: colors.accent }]}>
+                <Image source={{ uri: p.uri }} style={styles.thumbnailImg} />
+                <TouchableOpacity
+                  style={styles.thumbnailRemoveBtn}
+                  onPress={() => removePhoto(idx)}
+                  activeOpacity={0.8}
+                  disabled={isAnalyzing || isSubmitting}
+                >
+                  <X size={14} color="#ffffff" />
+                </TouchableOpacity>
+                <View style={[styles.thumbnailBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.thumbnailBadgeText}>#{idx + 1}</Text>
+                </View>
+                <View style={styles.thumbnailNameBar}>
+                  <Text style={styles.thumbnailNameText} numberOfLines={1} ellipsizeMode="middle">
+                    {p.name || `photo_${idx + 1}.jpg`}
+                  </Text>
+                </View>
+              </View>
+            ))}
+
+            {photos.length < 3 && (
+              <TouchableOpacity
+                style={[
+                  styles.addPhotoButton,
+                  { width: addBtnW(3 - photos.length) },
+                  {
+                    backgroundColor: colors.bgCardSecondary,
+                    borderColor: colors.borderColor,
+                  },
+                ]}
+                onPress={() => setIsPhotoModalOpen(true)}
+                disabled={isAnalyzing || isSubmitting}
+                activeOpacity={0.8}
+              >
+                <Camera size={24} color={colors.primary} />
+                <Text style={[styles.addPhotoButtonText, { color: colors.primary }]}>
+                  {photos.length === 0 ? 'Dodaj zdjęcia (1-3)' : '+ Dodaj kolejne'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Przycisk ręcznego uruchomienia analizy AI */}
+          {photos.length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.analyzeAiBtn,
+                { backgroundColor: hasAnalyzedCurrentPhotos ? '#059669' : colors.accent },
+                (hasAnalyzedCurrentPhotos || isAnalyzing || isSubmitting) && { opacity: 0.8 },
+              ]}
+              onPress={() => processPhotosWithAI(photos)}
+              disabled={hasAnalyzedCurrentPhotos || isAnalyzing || isSubmitting}
+              activeOpacity={0.8}
+            >
+              {hasAnalyzedCurrentPhotos ? (
+                <>
+                  <CheckCircle2 size={18} color="#ffffff" />
+                  <Text style={styles.analyzeAiBtnText}>✓ Zdjęcia zostały przeanalizowane</Text>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} color="#ffffff" />
+                  <Text style={styles.analyzeAiBtnText}>Przeanalizuj zdjęcia przez AI ({photos.length})</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* AI Loading Banner */}
@@ -317,9 +520,34 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
         )}
 
         {errorMsg && (
-          <View style={styles.errorBanner}>
-            <AlertTriangle size={18} color="#dc2626" />
-            <Text style={styles.errorText}>{errorMsg}</Text>
+          <View
+            style={[
+              styles.errorBanner,
+              errorMsg.includes('Przekroczono limit') && {
+                backgroundColor: '#fffbebfb',
+                borderColor: '#fcd34d',
+              },
+            ]}
+          >
+            <AlertTriangle
+              size={20}
+              color={errorMsg.includes('Przekroczono limit') ? '#d97706' : '#dc2626'}
+            />
+            <View style={{ flex: 1 }}>
+              {errorMsg.includes('Przekroczono limit') && (
+                <Text style={{ fontWeight: '800', color: '#b45309', fontSize: 13, marginBottom: 2 }}>
+                  ⚠️ Osiągnięto limit zapytań Gemini API
+                </Text>
+              )}
+              <Text
+                style={[
+                  styles.errorText,
+                  errorMsg.includes('Przekroczono limit') && { color: '#92400e' },
+                ]}
+              >
+                {errorMsg}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -474,7 +702,7 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
 
       {/* Modal Source Picker */}
       <Modal
-        visible={activePhotoModal != null}
+        visible={isPhotoModalOpen}
         transparent
         animationType="none"
         onRequestClose={() => handleClosePhotoModal()}
@@ -492,15 +720,15 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
                 ]}
               >
                 <Text style={[styles.modalTitle, { color: colors.textMain }]}>
-                  {activePhotoModal === 'receipt' ? 'Zdjęcie paragonu' : 'Zdjęcie licznika'}
+                  Dodaj zdjęcie ({photos.length + 1}/3)
                 </Text>
                 <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  Wybierz opcję dodania zdjęcia do automatycznej analizy AI:
+                  Możesz dodać od 1 do 3 zdjęć (np. paragon, dystrybutor, licznik) do automatycznej analizy AI:
                 </Text>
 
                 <TouchableOpacity
                   style={[styles.modalOption, { backgroundColor: colors.bgCardSecondary }]}
-                  onPress={() => activePhotoModal && handleClosePhotoModal(() => pickImage(activePhotoModal, true))}
+                  onPress={() => handleClosePhotoModal(() => pickImage(true))}
                 >
                   <Camera size={22} color={colors.primary} />
                   <Text style={[styles.modalOptionText, { color: colors.textMain }]}>
@@ -510,11 +738,11 @@ export const AddRefuelingView: React.FC<AddRefuelingViewProps> = ({ onSuccess, c
 
                 <TouchableOpacity
                   style={[styles.modalOption, { backgroundColor: colors.bgCardSecondary }]}
-                  onPress={() => activePhotoModal && handleClosePhotoModal(() => pickImage(activePhotoModal, false))}
+                  onPress={() => handleClosePhotoModal(() => pickImage(false))}
                 >
                   <ImageIcon size={22} color={colors.primary} />
                   <Text style={[styles.modalOptionText, { color: colors.textMain }]}>
-                    Wybierz gotowe zdjęcie (Galeria)
+                    Wybierz z galerii (możesz zaznaczyć do {3 - photos.length})
                   </Text>
                 </TouchableOpacity>
 
@@ -547,23 +775,105 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 12,
   },
-  photoGrid: {
-    flexDirection: 'row',
-    gap: 12,
+  multiPhotoSection: {
     marginBottom: 12,
   },
-  photoBtn: {
-    flex: 1,
+  multiPhotoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  photoCounterBadge: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  thumbnailsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  thumbnailWrapper: {
+    position: 'relative',
+    width: PHOTO_SLOT_W,
+    height: 84,
+    borderRadius: 14,
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  thumbnailImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  thumbnailRemoveBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(220, 38, 38, 0.85)',
+    borderRadius: 10,
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  thumbnailBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    zIndex: 10,
+  },
+  thumbnailBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  thumbnailNameBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  thumbnailNameText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  addPhotoButton: {
+    height: 84,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderRadius: 14,
-    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    paddingHorizontal: 8,
   },
-  photoBtnText: {
-    fontSize: 13,
+  addPhotoButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  analyzeAiBtn: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  analyzeAiBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '700',
   },
   aiBanner: {
@@ -682,10 +992,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
+    marginBottom: 2,
   },
   modalSub: {
     fontSize: 13,
     marginBottom: 8,
+    lineHeight: 18,
   },
   modalOption: {
     borderRadius: 14,
@@ -696,16 +1008,17 @@ const styles = StyleSheet.create({
   },
   modalOptionText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   modalCancelBtn: {
     borderRadius: 14,
     padding: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 4,
   },
   modalCancelText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

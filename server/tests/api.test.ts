@@ -115,4 +115,53 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('Nieprawidłowy parametr period');
   });
+
+  it('POST /api/refuelings powinien pominąć drugie identyczne zdjęcie w jednym tankowaniu', async () => {
+    const res = await request(app)
+      .post('/api/refuelings')
+      .send({
+        date: new Date().toISOString(),
+        cost: 150,
+        liters: 25,
+        mileage: 210000,
+        receipt_image_url: '/uploads/1723400000___paragon_unique_1.jpg',
+        dashboard_image_url: '/uploads/1723400000___paragon_unique_1.jpg'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.receipt_image_url).toBeDefined();
+    expect(res.body.dashboard_image_url).toBeNull();
+  });
+
+  it('POST /api/refuelings powinien pominąć zdjęcie, które zostało już wcześniej wykorzystane', async () => {
+    const uniquePhotoName = `photo_dup_test_${Date.now()}.jpg`;
+
+    // Pierwsze dodanie - powinno dołączyć zdjęcie
+    const res1 = await request(app)
+      .post('/api/refuelings')
+      .send({
+        date: new Date().toISOString(),
+        cost: 150,
+        liters: 25,
+        mileage: 210100,
+        receipt_image_url: `/inputs/test_folder/${uniquePhotoName}`
+      });
+
+    expect(res1.status).toBe(201);
+    expect(res1.body.receipt_image_url).toContain(uniquePhotoName);
+
+    // Próba dodania drugiego tankowania z tą samą nazwą zdjęcia - tankowanie się zapisze, ale duplikat zdjęcia zostanie pominięty
+    const res2 = await request(app)
+      .post('/api/refuelings')
+      .send({
+        date: new Date().toISOString(),
+        cost: 160,
+        liters: 26,
+        mileage: 210600,
+        receipt_image_url: `/inputs/other_folder/${uniquePhotoName}`
+      });
+
+    expect(res2.status).toBe(201);
+    expect(res2.body.receipt_image_url).toBeNull();
+  });
 });

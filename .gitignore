@@ -20,11 +20,15 @@ database.sqlite
 *.sqlite3
 *.db
 
-# Uploads directory
+# Uploads & Inputs directories
 uploads/*
 !uploads/.gitkeep
 server/uploads/*
 !server/uploads/.gitkeep
+inputs/*
+!inputs/.gitkeep
+server/inputs/*
+!server/inputs/.gitkeep
 
 # Tesseract trained data (OCR cache files)
 *.traineddata

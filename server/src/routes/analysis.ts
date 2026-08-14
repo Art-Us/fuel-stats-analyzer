@@ -2,18 +2,24 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { analyzePhotosController } from '../controllers/analysisController.js';
+import { sanitizeFilename } from '../utils/fileOrganizer.js';
 
 const router = Router();
 
-// Konfiguracja dyskowego zapisu plików w folderze uploads/
+// Konfiguracja dyskowego zapisu plików w folderze uploads/ z zachowaniem oryginalnej nazwy
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, path.resolve(process.cwd(), 'uploads'));
   },
   filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+    let originalName = file.originalname;
+    try {
+      // Prawidłowe dekodowanie polskich znaków jeśli nagłówek nadszedł jako latin1
+      originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    } catch (_) {}
+    const safeOriginal = sanitizeFilename(originalName);
+    const uniquePrefix = `${Date.now()}_${Math.round(Math.random() * 1e6)}`;
+    cb(null, `${uniquePrefix}___${safeOriginal}`);
   }
 });
 
@@ -24,10 +30,7 @@ const upload = multer({
   }
 });
 
-const uploadFields = upload.fields([
-  { name: 'receipt', maxCount: 1 },
-  { name: 'dashboard', maxCount: 1 }
-]);
+const uploadFields = upload.any();
 
 /**
  * @openapi

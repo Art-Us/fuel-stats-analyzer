@@ -11,9 +11,9 @@ import { setupSwagger } from './swagger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getDatabase } from './db.js';
 
-dotenv.config();
-dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') });
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ override: true });
+dotenv.config({ path: path.resolve(process.cwd(), 'server/.env'), override: true });
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,12 +24,18 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+const inputsDir = path.resolve(process.cwd(), 'inputs');
+if (!fs.existsSync(inputsDir)) {
+  fs.mkdirSync(inputsDir, { recursive: true });
+}
+
 // Globalne Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Statyczne serwowanie plików z folderu /uploads
+// Statyczne serwowanie plików z folderu /uploads i /inputs
 app.use('/uploads', express.static(uploadsDir));
+app.use('/inputs', express.static(inputsDir));
 
 // Konfiguracja Swagger UI
 setupSwagger(app);

@@ -1,8 +1,9 @@
 import exifr from 'exifr';
-import { createWorker } from 'tesseract.js';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import dotenv from 'dotenv';
+import { AppError } from '../middleware/errorHandler.js';
 
 export interface OllamaAnalysisResult {
   cost: number;
@@ -35,42 +36,19 @@ export async function extractExifDate(filePath: string): Promise<string | null> 
 }
 
 /**
- * Przeprowadza rozpoznawanie tekstu (OCR) na wskazanym pliku przy użyciu Tesseract.js.
+ * Zastępcza funkcja performOcr (wyłączona wg życzenia użytkownika).
  */
-export async function performOcr(filePath: string): Promise<string> {
-  let worker: any = null;
-  try {
-    if (!fs.existsSync(filePath)) {
-      return '';
-    }
-    // Inicjalizacja tesseract z obsługą języka polskiego i angielskiego
-    worker = await createWorker('pol+eng', 1, {
-      logger: () => {},
-      errorHandler: (err) => console.warn('[Tesseract Worker Warning]', err?.message || err)
-    });
-    const ret = await worker.recognize(filePath);
-    await worker.terminate();
-    return ret.data?.text || '';
-  } catch (error: any) {
-    console.warn(`[OCR Warning] Nie udało się wykonać OCR dla pliku ${filePath}:`, error?.message || error);
-    if (worker) {
-      try {
-        await worker.terminate();
-      } catch (_) {}
-    }
-    return '';
-  }
+export async function performOcr(_filePath: string): Promise<string> {
+  return '';
 }
 
 /**
- * Wysyła zebrany tekst z OCR (oraz opcjonalnie zdjęcia) do Google Gemini 1.5 Flash API.
+ * Wysyła zdjęcia bezpośrednio do Google Gemini 1.5 Flash Vision API (bez używania Tesseract OCR).
  */
 export async function analyzeWithGemini(
-  receiptFilePath?: string,
-  dashboardFilePath?: string,
-  receiptText?: string,
-  dashboardText?: string
+  filePaths: string[] | string
 ): Promise<OllamaAnalysisResult> {
+  dotenv.config({ override: true });
   const rawKey = process.env.GEMINI_API_KEY || '';
   const apiKey = rawKey.trim().replace(/^["']|["']$/g, '');
 
@@ -79,34 +57,24 @@ export async function analyzeWithGemini(
     return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
   }
 
+  const pathsArray: string[] = Array.isArray(filePaths)
+    ? filePaths
+    : [filePaths].filter(Boolean) as string[];
+
   try {
-    console.log('[Gemini API] 🤖 Rozpoczynam analizę tekstu z Tesseract OCR ze wsparciem zdjęć referencyjnych...');
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    console.log(`[Gemini API] ⚡ Rozpoczynam bezpośrednią analizę wizyjną dla ${pathsArray.length} zdjęć (model: ${geminiModel})...`);
     const parts: any[] = [];
 
     const prompt = `
-Jesteś precyzyjnym analitykiem danych dotyczących tankowania pojazdu.
-Oto surowy tekst wyekstrahowany ze zdjęć przez silnik Tesseract OCR:
-
-1. ODCZYTANY TEKST Z PARAGONU (Tesseract OCR):
-"""
-${receiptText || 'BRAK TEKSTU'}
-"""
-
-2. ODCZYTANY TEKST Z LICZNIKA (Tesseract OCR):
-"""
-${dashboardText || 'BRAK TEKSTU'}
-"""
-
-Zadanie:
-Przeanalizuj powyższy tekst z Tesseract OCR oraz dołączone zdjęcia referencyjne, aby bezbłędnie wyciągnąć wartości numeryczne:
+Jesteś precyzyjnym analitykiem wizyjnym danych dotyczących tankowania pojazdu.
+Przeanalizuj bezpośrednio dołączone zdjęcia (paragon, dystrybutor, licznik przebiegu z deski rozdzielczej) i wyciągnij z nich wartości numeryczne:
 - cost: łączna kwota do zapłaty w PLN (np. 185.50 lub 307.18)
 - liters: ilość zatankowanego paliwa w litrach (np. 28.75 lub 40.74)
 - price_per_liter: cena za 1 litr paliwa w PLN (np. 6.45 lub 7.54)
-- mileage: aktualny stan licznika / przebieg w km z deski rozdzielczej (np. 134200)
+- mileage: stan licznika / przebieg pojazdu w km z deski rozdzielczej (np. 134200)
 
-Uwaga: Tesseract OCR potrafi zamieniać cyfry na znaki (np. 0 na O, 8 na B, spacji w kwotach). Wykorzystaj odczytany tekst OCR oraz dołączony obraz, aby skorygować błędy OCR i podać w 100% dokładne liczby.
-
-Jeśli dana wartość nie występuje w tekście ani na zdjęciu, zwróć dla niej 0.
+Uważnie sprawdź cyfry na zdjęciu. Jeśli dana wartość nie występuje na żadnym ze zdjęć, zwróć dla niej 0.
 
 ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
 {
@@ -118,33 +86,21 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
 `;
     parts.push({ text: prompt });
 
-    // Dołączenie zdjęcia paragonu jako materiał referencyjny dla Gemini
-    if (receiptFilePath && fs.existsSync(receiptFilePath)) {
-      const receiptBuffer = fs.readFileSync(receiptFilePath);
-      const ext = path.extname(receiptFilePath).toLowerCase();
-      const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
-      parts.push({
-        inlineData: {
-          mimeType: mimeType,
-          data: receiptBuffer.toString('base64')
-        }
-      });
+    // Dołączenie przesłanych zdjęć w formacie Base64 bezpośrednio dla modelu wizyjnego Gemini Flash
+    for (const filePath of pathsArray) {
+      if (filePath && fs.existsSync(filePath)) {
+        const buffer = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+        parts.push({
+          inlineData: {
+            mimeType,
+            data: buffer.toString('base64')
+          }
+        });
+      }
     }
 
-    // Dołączenie zdjęcia licznika jako materiał referencyjny dla Gemini
-    if (dashboardFilePath && fs.existsSync(dashboardFilePath)) {
-      const dashboardBuffer = fs.readFileSync(dashboardFilePath);
-      const ext = path.extname(dashboardFilePath).toLowerCase();
-      const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
-      parts.push({
-        inlineData: {
-          mimeType: mimeType,
-          data: dashboardBuffer.toString('base64')
-        }
-      });
-    }
-
-    const geminiModel = process.env.GEMINI_MODEL || 'gemini-flash-latest';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
 
     const response = await axios.post(
@@ -155,7 +111,7 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
           responseMimeType: 'application/json'
         }
       },
-      { timeout: 20000 }
+      { timeout: 25000 }
     );
 
     const rawResponse: string = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
@@ -173,28 +129,36 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
       mileage: typeof parsed.mileage === 'number' && !isNaN(parsed.mileage) ? parsed.mileage : 0
     };
   } catch (error: any) {
-    console.error('[Gemini API Error] Błąd podczas analizy przez Gemini:', error?.response?.data || error?.message || error);
+    const status = error?.response?.status;
+    const errorDataStr = JSON.stringify(error?.response?.data || error?.message || '');
+
+    console.error('[Gemini API Error] Błąd podczas analizy przez Gemini:', errorDataStr);
+
+    // Wykrywanie przekroczenia limitu zapytań Gemini API Free Tier (429 Rate Limit / Quota Exceeded)
+    if (status === 429 || errorDataStr.includes('Quota exceeded') || errorDataStr.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = errorDataStr.match(/retry in ([0-9.]+)s/i);
+      const retrySecs = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 60;
+      throw new AppError(
+        `Przekroczono limit zapytań darmowego API Gemini. Spróbuj ponownie za ok. ${retrySecs} sekund.`,
+        429,
+        { retryAfter: retrySecs, quotaExceeded: true }
+      );
+    }
+
     return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
   }
 }
 
 /**
- * Główna funkcja orkiestrująca: Wykonuje bezpośrednio szybką analizę przez Gemini 1.5 Flash API.
+ * Główna funkcja orkiestrująca analizę zdjęć bezpośrednio przez Gemini Vision API.
  */
 export async function analyzePhotosWithAi(
-  receiptFilePath?: string,
-  dashboardFilePath?: string,
-  receiptText?: string,
-  dashboardText?: string
+  filePaths: string[] | string
 ): Promise<OllamaAnalysisResult> {
-  console.log('[AI Service] Wywołuję analizę zdjęć bezpośrednio przez Gemini 1.5 Flash API...');
-  return await analyzeWithGemini(receiptFilePath, dashboardFilePath, receiptText, dashboardText);
+  console.log('[AI Service] Wywołuję bezpośrednią analizę wizyjną zdjęć przez Gemini 1.5 Flash API...');
+  return await analyzeWithGemini(filePaths);
 }
 
-export async function analyzeTextWithOllama(
-  receiptText: string,
-  dashboardText: string
-): Promise<OllamaAnalysisResult> {
-  return analyzePhotosWithAi(undefined, undefined, receiptText, dashboardText);
+export async function analyzeTextWithOllama(): Promise<OllamaAnalysisResult> {
+  return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
 }
-
