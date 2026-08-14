@@ -65,10 +65,11 @@ export async function analyzePhotosController(
     // 2. Bezpośrednia analiza wizyjna (lub szybkie pominięcie AI przy zapisie formularza)
     let aiResult = { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
     const skipAi = req.body?.skip_ai === 'true' || req.body?.skip_ai === true;
+    const customApiKey = req.body?.api_key || (req.headers['x-gemini-api-key'] as string) || null;
 
     if (!skipAi) {
       console.log(`[SERVER LOG] 🤖 Przekazuję ${allFilePaths.length} zdjęć bezpośrednio do Gemini Vision API...`);
-      aiResult = await analyzePhotosWithAi(allFilePaths);
+      aiResult = await analyzePhotosWithAi(allFilePaths, customApiKey);
       console.log(`[SERVER LOG] ✨ Wynik z Gemini Vision AI:`, JSON.stringify(aiResult, null, 2));
     } else {
       console.log(`[SERVER LOG] ⚡ Pomijam Gemini Vision AI (tryb szybkiego przesłania plików przy zapisie).`);

@@ -235,8 +235,8 @@ export const getCarInfo = async (): Promise<CarInfo> => {
   return response.data;
 };
 
-export const updateCarInfo = async (name: string): Promise<CarInfo> => {
-  const response = await api.put<CarInfo>('/car', { name });
+export const updateCarInfo = async (name: string, gemini_api_key?: string): Promise<CarInfo> => {
+  const response = await api.put<CarInfo>('/car', { name, gemini_api_key });
   return response.data;
 };
 
