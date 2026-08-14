@@ -276,7 +276,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
                         <ActivityIndicator size="small" color={colors.primary} />
                       ) : (
                         <>
-                          <Download size={14} color={colors.primary} />
+                          <Upload size={14} color={colors.primary} />
                           <Text style={[styles.backupBtnText, { color: colors.primary }]}>Eksport</Text>
                         </>
                       )}
@@ -299,7 +299,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ refreshTrigger = 0 }) 
                         <ActivityIndicator size="small" color="#16a34a" />
                       ) : (
                         <>
-                          <Upload size={14} color="#16a34a" />
+                          <Download size={14} color="#16a34a" />
                           <Text style={[styles.backupBtnText, { color: '#16a34a' }]}>Import</Text>
                         </>
                       )}
