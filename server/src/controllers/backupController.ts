@@ -22,6 +22,9 @@ function createZipArchive(options?: any) {
   throw new Error('Nie udało się zainicjalizować archivera ZIP');
 }
 
+import AdmZipPkg from 'adm-zip';
+const AdmZip = (AdmZipPkg as any).default || AdmZipPkg;
+
 export async function exportBackupController(
   _req: Request,
   res: Response,
@@ -146,5 +149,133 @@ export async function exportBackupController(
     await archive.finalize();
   } catch (error) {
     next(error);
+  }
+}
+
+export async function importBackupController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  let uploadedFilePath: string | null = null;
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Nie przesłano pliku archiwum ZIP (pole "backup").' });
+      return;
+    }
+
+    uploadedFilePath = req.file.path;
+    const zip = new AdmZip(uploadedFilePath);
+    const zipEntries = zip.getEntries();
+
+    // 1. Odnalezienie pliku backup.json
+    const backupEntry = zipEntries.find(
+      (entry: any) => entry.entryName.toLowerCase() === 'backup.json' || entry.name.toLowerCase() === 'backup.json'
+    );
+
+    if (!backupEntry) {
+      res.status(400).json({ error: 'Nieprawidłowy plik ZIP: brak pliku backup.json w archiwum.' });
+      return;
+    }
+
+    const jsonText = zip.readAsText(backupEntry);
+    let manifest: any;
+    try {
+      manifest = JSON.parse(jsonText);
+    } catch (_) {
+      res.status(400).json({ error: 'Nieprawidłowy format JSON w pliku backup.json.' });
+      return;
+    }
+
+    const db = await getDatabase();
+
+    // 2. Przywrócenie nazwy samochodu
+    if (manifest.car?.name && typeof manifest.car.name === 'string') {
+      await db.run(
+        `INSERT INTO settings (key, value) VALUES ('car_name', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [manifest.car.name.trim()]
+      );
+    }
+
+    // 3. Wypakowanie wszystkich zdjęć z folderu photos/ do inputs/
+    const inputsDir = path.resolve(process.cwd(), 'inputs');
+    if (!fs.existsSync(inputsDir)) {
+      fs.mkdirSync(inputsDir, { recursive: true });
+    }
+
+    for (const entry of zipEntries) {
+      if (entry.isDirectory) continue;
+      const normName = entry.entryName.replace(/\\/g, '/');
+      if (normName.startsWith('photos/')) {
+        const relativePath = normName.replace(/^photos\//, '');
+        const targetPath = path.join(inputsDir, relativePath);
+        const targetDir = path.dirname(targetPath);
+
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        fs.writeFileSync(targetPath, entry.getData());
+      }
+    }
+
+    // 4. Przywrócenie wpisów tankowań do bazy danych
+    let importedCount = 0;
+    if (Array.isArray(manifest.refuelings)) {
+      for (const r of manifest.refuelings) {
+        if (!r.date || r.cost === undefined || r.liters === undefined || r.mileage === undefined) {
+          continue;
+        }
+
+        // Mapowanie ścieżek zdjęć
+        const receiptUrl = r.receipt_image
+          ? `/${r.receipt_image.replace(/^photos\//, 'inputs/')}`
+          : r.receipt_image_url || null;
+
+        const dashboardUrl = r.dashboard_image
+          ? `/${r.dashboard_image.replace(/^photos\//, 'inputs/')}`
+          : r.dashboard_image_url || null;
+
+        // Sprawdzenie czy takie tankowanie już istnieje w bazie
+        const existing = await db.get(
+          'SELECT id FROM refuelings WHERE date = ? AND mileage = ? AND cost = ?',
+          [r.date, r.mileage, r.cost]
+        );
+
+        if (!existing) {
+          await db.run(
+            `INSERT INTO refuelings (date, cost, liters, price_per_liter, mileage, receipt_image_url, dashboard_image_url, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              r.date,
+              r.cost,
+              r.liters,
+              r.price_per_liter || (r.liters > 0 ? r.cost / r.liters : 0),
+              r.mileage,
+              receiptUrl,
+              dashboardUrl,
+              r.created_at || new Date().toISOString(),
+            ]
+          );
+          importedCount++;
+        }
+      }
+    }
+
+    res.status(200).json({
+      message: 'Kopia zapasowa została pomyślnie zaimportowana.',
+      imported_refuelings: importedCount,
+      total_in_backup: Array.isArray(manifest.refuelings) ? manifest.refuelings.length : 0,
+      car_name: manifest.car?.name || null,
+    });
+  } catch (error) {
+    next(error);
+  } finally {
+    if (uploadedFilePath && fs.existsSync(uploadedFilePath)) {
+      try {
+        fs.unlinkSync(uploadedFilePath);
+      } catch (_) {}
+    }
   }
 }

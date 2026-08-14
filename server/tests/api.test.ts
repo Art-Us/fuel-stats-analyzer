@@ -223,4 +223,21 @@ describe('API Refuelings & Stats Endpoints', () => {
     expect(res.headers['content-type']).toContain('application/zip');
     expect(res.headers['content-disposition']).toContain('attachment; filename="fuel_app_backup_');
   });
+
+  it('POST /api/backup/import powinien pomyślnie zaimportować bazę z pliku ZIP', async () => {
+    // 1. Pobieramy eksport ZIP
+    const exportRes = await request(app)
+      .get('/api/backup/export')
+      .responseType('blob');
+
+    expect(exportRes.status).toBe(200);
+
+    // 2. Importujemy pobrany plik ZIP
+    const importRes = await request(app)
+      .post('/api/backup/import')
+      .attach('backup', exportRes.body, 'test_backup.zip');
+
+    expect(importRes.status).toBe(200);
+    expect(importRes.body.message).toContain('pomyślnie');
+  });
 });

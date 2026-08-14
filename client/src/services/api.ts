@@ -111,4 +111,23 @@ export const updateCarInfo = async (name: string, gemini_api_key?: string): Prom
 
 export const getExportBackupUrl = (): string => '/api/backup/export';
 
+export interface ImportBackupResponse {
+  message: string;
+  imported_refuelings: number;
+  total_in_backup: number;
+  car_name: string | null;
+}
+
+export const importBackup = async (file: File): Promise<ImportBackupResponse> => {
+  const formData = new FormData();
+  formData.append('backup', file);
+
+  const response = await api.post<ImportBackupResponse>('/backup/import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 export default api;
