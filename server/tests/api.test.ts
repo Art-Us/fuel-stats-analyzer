@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import refuelingsRouter from '../src/routes/refuelings.js';
 import statsRouter from '../src/routes/stats.js';
 import { errorHandler } from '../src/middleware/errorHandler.js';
 import { getDatabase } from '../src/db.js';
+import { removePhotoFile } from '../src/utils/fileOrganizer.js';
 
 const app = express();
 app.use(express.json());
@@ -13,9 +14,30 @@ app.use('/api/stats', statsRouter);
 app.use(errorHandler);
 
 describe('API Refuelings & Stats Endpoints', () => {
+  const createdRefuelingIds: number[] = [];
+  const createdPhotoUrls: string[] = [];
+
+  const trackCreated = (body: any) => {
+    if (body?.id) createdRefuelingIds.push(body.id);
+    if (body?.receipt_image_url) createdPhotoUrls.push(body.receipt_image_url);
+    if (body?.dashboard_image_url) createdPhotoUrls.push(body.dashboard_image_url);
+  };
+
   beforeAll(async () => {
     // Upewniamy się, że baza danych SQLite jest gotowa
     await getDatabase();
+  });
+
+  afterAll(async () => {
+    // Usuwamy wszystkie dane dodane w trakcie testów
+    const db = await getDatabase();
+    if (createdRefuelingIds.length > 0) {
+      const placeholders = createdRefuelingIds.map(() => '?').join(',');
+      await db.run(`DELETE FROM refuelings WHERE id IN (${placeholders})`, ...createdRefuelingIds);
+    }
+    for (const url of createdPhotoUrls) {
+      removePhotoFile(url);
+    }
   });
 
   it('GET /api/refuelings powinien zwrócić status 200 oraz tablicę', async () => {
@@ -35,6 +57,8 @@ describe('API Refuelings & Stats Endpoints', () => {
     const res = await request(app)
       .post('/api/refuelings')
       .send(newRefueling);
+
+    trackCreated(res.body);
 
     expect(res.status).toBe(201);
     expect(res.body.id).toBeDefined();
@@ -114,5 +138,60 @@ describe('API Refuelings & Stats Endpoints', () => {
     const res = await request(app).get('/api/stats?period=invalid_period');
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('Nieprawidłowy parametr period');
+  });
+
+  it('POST /api/refuelings powinien pominąć drugie identyczne zdjęcie w jednym tankowaniu', async () => {
+    const res = await request(app)
+      .post('/api/refuelings')
+      .send({
+        date: new Date().toISOString(),
+        cost: 150,
+        liters: 25,
+        mileage: 210000,
+        receipt_image_url: '/inputs/temp/1723400000___paragon_unique_1.jpg',
+        dashboard_image_url: '/inputs/temp/1723400000___paragon_unique_1.jpg'
+      });
+
+    trackCreated(res.body);
+
+    expect(res.status).toBe(201);
+    expect(res.body.receipt_image_url).toBeDefined();
+    expect(res.body.dashboard_image_url).toBeNull();
+  });
+
+  it('POST /api/refuelings powinien pominąć zdjęcie, które zostało już wcześniej wykorzystane', async () => {
+    const uniquePhotoName = `photo_dup_test_${Date.now()}.jpg`;
+
+    // Pierwsze dodanie - powinno dołączyć zdjęcie
+    const res1 = await request(app)
+      .post('/api/refuelings')
+      .send({
+        date: new Date().toISOString(),
+        cost: 150,
+        liters: 25,
+        mileage: 210100,
+        receipt_image_url: `/inputs/test_folder/${uniquePhotoName}`
+      });
+
+    trackCreated(res1.body);
+
+    expect(res1.status).toBe(201);
+    expect(res1.body.receipt_image_url).toContain(uniquePhotoName);
+
+    // Próba dodania drugiego tankowania z tą samą nazwą zdjęcia - tankowanie się zapisze, ale duplikat zdjęcia zostanie pominięty
+    const res2 = await request(app)
+      .post('/api/refuelings')
+      .send({
+        date: new Date().toISOString(),
+        cost: 160,
+        liters: 26,
+        mileage: 210600,
+        receipt_image_url: `/inputs/other_folder/${uniquePhotoName}`
+      });
+
+    trackCreated(res2.body);
+
+    expect(res2.status).toBe(201);
+    expect(res2.body.receipt_image_url).toBeNull();
   });
 });

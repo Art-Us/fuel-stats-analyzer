@@ -11,23 +11,25 @@ import { setupSwagger } from './swagger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getDatabase } from './db.js';
 
-dotenv.config();
+dotenv.config({ override: true });
+dotenv.config({ path: path.resolve(process.cwd(), 'server/.env'), override: true });
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Tworzenie katalogu na przesłane pliki (zdjęcia paragonów/liczników)
-const uploadsDir = path.resolve(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Tworzenie katalogu na pliki zdjęć (inputs)
+const inputsDir = path.resolve(process.cwd(), 'inputs');
+if (!fs.existsSync(inputsDir)) {
+  fs.mkdirSync(inputsDir, { recursive: true });
 }
 
 // Globalne Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Statyczne serwowanie plików z folderu /uploads
-app.use('/uploads', express.static(uploadsDir));
+// Statyczne serwowanie plików z folderu /inputs
+app.use('/inputs', express.static(inputsDir));
 
 // Konfiguracja Swagger UI
 setupSwagger(app);

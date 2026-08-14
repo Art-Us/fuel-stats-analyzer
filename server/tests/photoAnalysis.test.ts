@@ -1,37 +1,34 @@
-import { describe, it, expect, vi } from 'vitest';
-import { analyzeTextWithOllama, extractExifDate } from '../src/services/photoAnalysisService.js';
-import axios from 'axios';
+import { describe, it, expect } from 'vitest';
+import { extractExifDate } from '../src/services/photoAnalysisService.js';
+import { sanitizeFilename, extractOriginalFilename } from '../src/utils/fileOrganizer.js';
 
-vi.mock('axios');
-
-describe('photoAnalysisService', () => {
-  describe('analyzeTextWithOllama', () => {
-    it('powinien poprawnie przetworzyć JSON zwrócony przez Ollamę', async () => {
-      const mockOllamaResponse = {
-        data: {
-          response: '```json\n{\n  "cost": 185.50,\n  "liters": 28.75,\n  "price_per_liter": 6.45,\n  "mileage": 134200\n}\n```'
-        }
-      };
-
-      vi.mocked(axios.post).mockResolvedValueOnce(mockOllamaResponse);
-
-      const result = await analyzeTextWithOllama('ORLEN SUMA 185.50 PLN', 'DESKA 134200 km');
-
-      expect(result.cost).toBe(185.50);
-      expect(result.liters).toBe(28.75);
-      expect(result.price_per_liter).toBe(6.45);
-      expect(result.mileage).toBe(134200);
+describe('fileOrganizer & photoAnalysisService', () => {
+  describe('sanitizeFilename', () => {
+    it('powinien usunąć niedozwolone znaki i zachować rozszerzenie', () => {
+      const sanitized = sanitizeFilename('photo:name*?.jpg');
+      expect(sanitized).toBe('photo_name__.jpg');
     });
 
-    it('powinien obsłużyć błąd serwera Ollama i zwrócić domyślne zera', async () => {
-      vi.mocked(axios.post).mockRejectedValueOnce(new Error('Connection refused'));
+    it('powinien usunąć ścieżki nadrzędne i zachować bezpieczną nazwę', () => {
+      const sanitized = sanitizeFilename('folder/sub/photo.jpg');
+      expect(sanitized).toBe('photo.jpg');
+    });
 
-      const result = await analyzeTextWithOllama('brak', 'brak');
+    it('powinien poprawnie obsłużyć standardową nazwę z telefonu', () => {
+      const sanitized = sanitizeFilename('IMG_20260814_100856.jpg');
+      expect(sanitized).toBe('IMG_20260814_100856.jpg');
+    });
+  });
 
-      expect(result.cost).toBe(0);
-      expect(result.liters).toBe(0);
-      expect(result.price_per_liter).toBe(0);
-      expect(result.mileage).toBe(0);
+  describe('extractOriginalFilename', () => {
+    it('powinien wyciągnąć oryginalną nazwę pliku po separatorze ___', () => {
+      const original = extractOriginalFilename('1723625400000_123456___IMG_20260814_100856.jpg');
+      expect(original).toBe('IMG_20260814_100856.jpg');
+    });
+
+    it('powinien zwrócić oczyszczoną nazwę jeśli brak separatora', () => {
+      const original = extractOriginalFilename('paragon_orlen.png');
+      expect(original).toBe('paragon_orlen.png');
     });
   });
 

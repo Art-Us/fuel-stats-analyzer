@@ -17,9 +17,9 @@ database.sqlite
 *.sqlite3
 *.db
 
-# Uploads directory
-uploads/*
-!uploads/.gitkeep
+# Inputs directory
+inputs/*
+!inputs/.gitkeep
 
 # OCR trained data files
 *.traineddata

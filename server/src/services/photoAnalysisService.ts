@@ -1,6 +1,9 @@
 import exifr from 'exifr';
-import { createWorker } from 'tesseract.js';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+import { AppError } from '../middleware/errorHandler.js';
 
 export interface OllamaAnalysisResult {
   cost: number;
@@ -33,63 +36,45 @@ export async function extractExifDate(filePath: string): Promise<string | null> 
 }
 
 /**
- * Przeprowadza rozpoznawanie tekstu (OCR) na wskazanym pliku przy użyciu Tesseract.js.
+ * Zastępcza funkcja performOcr (wyłączona wg życzenia użytkownika).
  */
-export async function performOcr(filePath: string): Promise<string> {
-  let worker;
-  try {
-    // Inicjalizacja tesseract z obsługą języka polskiego i angielskiego
-    worker = await createWorker('pol+eng');
-    const ret = await worker.recognize(filePath);
-    await worker.terminate();
-    return ret.data?.text || '';
-  } catch (error) {
-    console.error(`[OCR Error] Błąd podczas analizy pliku ${filePath}:`, error);
-    if (worker) {
-      try {
-        await worker.terminate();
-      } catch (_) {}
-    }
-    return '';
-  }
+export async function performOcr(_filePath: string): Promise<string> {
+  return '';
 }
 
 /**
- * Wysyła zebrany tekst z OCR (paragon i licznik) do lokalnego modelu Ollama (qwen2.5:3b)
- * i wymusza zwrot czystego obiektu JSON.
+ * Wysyła zdjęcia bezpośrednio do Google Gemini 1.5 Flash Vision API (bez używania Tesseract OCR).
  */
-export async function analyzeTextWithOllama(
-  receiptText: string,
-  dashboardText: string
+export async function analyzeWithGemini(
+  filePaths: string[] | string
 ): Promise<OllamaAnalysisResult> {
-  const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
-  const model = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+  dotenv.config({ override: true });
+  const rawKey = process.env.GEMINI_API_KEY || '';
+  const apiKey = rawKey.trim().replace(/^["']|["']$/g, '');
 
+  if (!apiKey) {
+    console.warn('[Gemini Warning] Brak klucza GEMINI_API_KEY w pliku .env lub jest pusty! Nie można użyć Gemini API.');
+    return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
+  }
+
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+
+  const pathsArray: string[] = Array.isArray(filePaths)
+    ? filePaths
+    : [filePaths].filter(Boolean) as string[];
+
+  const parts: any[] = [];
   const prompt = `
-Jesteś precyzyjnym analitykiem OCR dla danych dotyczących tankowania pojazdu.
-Twoim zadaniem jest przetworzenie poniższych dwóch fragmentów tekstu ze zdjęć i wyciągnięcie kluczowych wartości numerycznych.
+Jesteś precyzyjnym analitykiem wizyjnym danych dotyczących tankowania pojazdu.
+Przeanalizuj bezpośrednio dołączone zdjęcia (paragon, dystrybutor, licznik przebiegu z deski rozdzielczej) i wyciągnij z nich wartości numeryczne:
+- cost: łączna kwota do zapłaty w PLN (np. 185.50 lub 307.18)
+- liters: ilość zatankowanego paliwa w litrach (np. 28.75 lub 40.74)
+- price_per_liter: cena za 1 litr paliwa w PLN (np. 6.45 lub 7.54)
+- mileage: stan licznika / przebieg pojazdu w km z deski rozdzielczej (np. 134200)
 
-1. TEKST Z PARAGONU LUB DYSTRYBUTORA (receiptText):
-"""
-${receiptText || 'BRAK TEKSTU'}
-"""
+Uważnie sprawdź cyfry na zdjęciu. Jeśli dana wartość nie występuje na żadnym ze zdjęć, zwróć dla niej 0.
 
-2. TEKST Z LICZNIKA DESKI ROZDZIELCZEJ (dashboardText):
-"""
-${dashboardText || 'BRAK TEKSTU'}
-"""
-
-Zasady ekstrakcji:
-- z receiptText wyciągnij:
-  - cost: łączna kwota do zapłaty (liczba zmiennoprzecinkowa, np. 185.50)
-  - liters: zatankowana ilość paliwa w litrach (liczba zmiennoprzecinkowa, np. 28.75)
-  - price_per_liter: cena za 1 litr paliwa (liczba zmiennoprzecinkowa, np. 6.45)
-- z dashboardText wyciągnij:
-  - mileage: aktualny stan licznika / przebieg w km (liczba całkowita lub zmiennoprzecinkowa, np. 134200)
-
-Jeśli dana wartość nie występuje w tekście lub tekst jest nieczytelny, zwróć wartość 0 dla tego pola.
-
-ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO INNEGO TEKSTU ANI MARKDOWN:
+ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO MARKDOWNU:
 {
   "cost": 0,
   "liters": 0,
@@ -97,24 +82,39 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO INNEGO TEKSTU ANI MARKDOWN:
   "mileage": 0
 }
 `;
+  parts.push({ text: prompt });
+
+  // Dołączenie przesłanych zdjęć w formacie Base64 bezpośrednio dla modelu wizyjnego Gemini Flash
+  for (const filePath of pathsArray) {
+    if (filePath && fs.existsSync(filePath)) {
+      const buffer = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+      parts.push({
+        inlineData: {
+          mimeType,
+          data: buffer.toString('base64')
+        }
+      });
+    }
+  }
 
   try {
+    console.log(`[Gemini API] ⚡ Rozpoczynam bezpośrednią analizę wizyjną dla ${pathsArray.length} zdjęć (model: ${geminiModel})...`);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
+
     const response = await axios.post(
-      ollamaUrl,
+      url,
       {
-        model: model,
-        prompt: prompt,
-        stream: false,
-        format: 'json'
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
       },
-      {
-        timeout: 45000
-      }
+      { timeout: 25000 }
     );
 
-    const rawResponse: string = response.data?.response || '';
-
-    // Oczyszczenie odpowiedzi z ewentualnych znaczników markdown (np. ```json ... ```)
+    const rawResponse: string = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     const cleanedText = rawResponse
       .replace(/```json/gi, '')
       .replace(/```/g, '')
@@ -129,12 +129,44 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY OBIEKT JSON BEZ ŻADNEGO INNEGO TEKSTU ANI MARKDOWN:
       mileage: typeof parsed.mileage === 'number' && !isNaN(parsed.mileage) ? parsed.mileage : 0
     };
   } catch (error: any) {
-    console.error('[Ollama API Error] Błąd podczas komunikacji z Ollamą:', error?.message || error);
-    return {
-      cost: 0,
-      liters: 0,
-      price_per_liter: 0,
-      mileage: 0
-    };
+    const status = error?.response?.status;
+    const errorDataStr = JSON.stringify(error?.response?.data || error?.message || '');
+    console.error(`[Gemini API Error] Model ${geminiModel} zwrócił błąd (${status}):`, errorDataStr);
+
+    if (status === 503 || errorDataStr.includes('UNAVAILABLE') || errorDataStr.includes('high demand')) {
+      throw new AppError(
+        'Model AI Gemini jest w tej chwili przeciążony. Odczekaj chwilę i spróbuj ponownie.',
+        503
+      );
+    }
+
+    if (status === 429 || errorDataStr.includes('Quota exceeded') || errorDataStr.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = errorDataStr.match(/retry in ([0-9.]+)s/i);
+      const retrySecs = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 60;
+      throw new AppError(
+        `Przekroczono limit zapytań darmowego API Gemini. Spróbuj ponownie za ok. ${retrySecs} sekund.`,
+        429,
+        { retryAfter: retrySecs, quotaExceeded: true }
+      );
+    }
+
+    throw new AppError(
+      `Nie udało się przeanalizować zdjęć przez AI (${error?.message || 'Błąd serwera'}). Spróbuj ponownie.`,
+      400
+    );
   }
+}
+
+/**
+ * Główna funkcja orkiestrująca analizę zdjęć bezpośrednio przez Gemini Vision API.
+ */
+export async function analyzePhotosWithAi(
+  filePaths: string[] | string
+): Promise<OllamaAnalysisResult> {
+  console.log('[AI Service] Wywołuję bezpośrednią analizę wizyjną zdjęć przez Gemini 1.5 Flash API...');
+  return await analyzeWithGemini(filePaths);
+}
+
+export async function analyzeTextWithOllama(): Promise<OllamaAnalysisResult> {
+  return { cost: 0, liters: 0, price_per_liter: 0, mileage: 0 };
 }

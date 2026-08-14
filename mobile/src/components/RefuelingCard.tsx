@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Fuel, Droplet, TrendingUp, Coins, Info } from 'lucide-react-native';
+import { Fuel, Droplet, TrendingUp, Coins, Info, Camera } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Refueling } from '../types/api';
 
@@ -73,6 +73,14 @@ export const RefuelingCard: React.FC<RefuelingCardProps> = ({ refueling, onPress
         <Text style={[styles.detailsText, { color: colors.textMuted }]}>
           {liters.toFixed(2)} l  →  {price_per_liter ? `${price_per_liter.toFixed(2)} PLN/l` : ''}
         </Text>
+        {(refueling.receipt_image_url || refueling.dashboard_image_url) && (
+          <View style={[styles.photoBadge, { backgroundColor: colors.bgCardSecondary }]}>
+            <Camera size={13} color={colors.primary} />
+            <Text style={[styles.photoBadgeText, { color: colors.primary }]}>
+              {refueling.receipt_image_url && refueling.dashboard_image_url ? '2 zdjęcia' : '1 zdjęcie'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Divider */}
@@ -210,5 +218,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic',
     fontWeight: '500',
+  },
+  photoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    marginLeft: 'auto',
+  },
+  photoBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Image as ImageIcon, Calendar, DollarSign, Fuel, Gauge, Save, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { analyzePhotos, createRefueling } from '../services/api';
+import { analyzePhotos, createRefueling, getRefuelings } from '../services/api';
 
 export const AddRefuelingView: React.FC = () => {
   const navigate = useNavigate();
@@ -21,6 +21,31 @@ export const AddRefuelingView: React.FC = () => {
   const [dashboardFile, setDashboardFile] = useState<File | null>(null);
   const [activePhotoModal, setActivePhotoModal] = useState<'receipt' | 'dashboard' | null>(null);
   const [isClosingModal, setIsClosingModal] = useState<boolean>(false);
+  const [existingPhotosMap, setExistingPhotosMap] = useState<Map<string, { date: string; id: number }>>(new Map());
+
+  useEffect(() => {
+    const loadExisting = async () => {
+      try {
+        const list = await getRefuelings('all');
+        const map = new Map<string, { date: string; id: number }>();
+        list.forEach(r => {
+          const rDate = new Date(r.date).toISOString().split('T')[0];
+          if (r.receipt_image_url) {
+            const raw = r.receipt_image_url.split('/').pop() || '';
+            const clean = raw.includes('___') ? raw.split('___').slice(1).join('___') : raw;
+            if (clean) map.set(clean.toLowerCase(), { date: rDate, id: r.id });
+          }
+          if (r.dashboard_image_url) {
+            const raw = r.dashboard_image_url.split('/').pop() || '';
+            const clean = raw.includes('___') ? raw.split('___').slice(1).join('___') : raw;
+            if (clean) map.set(clean.toLowerCase(), { date: rDate, id: r.id });
+          }
+        });
+        setExistingPhotosMap(map);
+      } catch (_) {}
+    };
+    loadExisting();
+  }, []);
 
   const closeModal = (callback?: () => void) => {
     setIsClosingModal(true);
@@ -77,7 +102,6 @@ export const AddRefuelingView: React.FC = () => {
 
       // Auto-wypełnianie formularza pobranymi danymi
       if (result.date) {
-        // Konwersja formatu daty do YYYY-MM-DD
         const formattedDate = new Date(result.date).toISOString().split('T')[0];
         setDate(formattedDate);
       }
@@ -105,7 +129,7 @@ export const AddRefuelingView: React.FC = () => {
       setAiSuccessMsg('Dane ze zdjęć zostały automatycznie odczytane przez AI!');
     } catch (err: any) {
       console.error('Błąd podczas analizy AI:', err);
-      setErrorMsg('Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
+      setErrorMsg(err?.message || 'Nie udało się przeanalizować zdjęć. Uzupełnij dane ręcznie.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -114,6 +138,19 @@ export const AddRefuelingView: React.FC = () => {
   const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
+      const selectedName = selected.name.toLowerCase();
+
+      if (dashboardFile && dashboardFile.name.toLowerCase() === selectedName) {
+        setErrorMsg(`Zdjęcie "${selected.name}" jest już wybrane jako zdjęcie licznika.`);
+        return;
+      }
+
+      const matchDb = existingPhotosMap.get(selectedName);
+      if (matchDb) {
+        setErrorMsg(`Zdjęcie "${selected.name}" zostało już wcześniej wykorzystane w tankowaniu z dnia ${matchDb.date} (ID: ${matchDb.id}) i nie zostało dołączone.`);
+        return;
+      }
+
       setReceiptFile(selected);
       processPhotosWithAI(selected, dashboardFile);
     }
@@ -122,6 +159,19 @@ export const AddRefuelingView: React.FC = () => {
   const handleDashboardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
+      const selectedName = selected.name.toLowerCase();
+
+      if (receiptFile && receiptFile.name.toLowerCase() === selectedName) {
+        setErrorMsg(`Zdjęcie "${selected.name}" jest już wybrane jako zdjęcie paragonu.`);
+        return;
+      }
+
+      const matchDb = existingPhotosMap.get(selectedName);
+      if (matchDb) {
+        setErrorMsg(`Zdjęcie "${selected.name}" zostało już wcześniej wykorzystane w tankowaniu z dnia ${matchDb.date} (ID: ${matchDb.id}) i nie zostało dołączone.`);
+        return;
+      }
+
       setDashboardFile(selected);
       processPhotosWithAI(receiptFile, selected);
     }
@@ -211,7 +261,9 @@ export const AddRefuelingView: React.FC = () => {
           disabled={isAnalyzing || isSubmitting}
         >
           <Camera size={24} />
-          <span>{receiptFile ? '✓ Paragon dodany' : 'Zdjęcie: Paragon'}</span>
+          <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {receiptFile ? `✓ ${receiptFile.name}` : 'Zdjęcie: Paragon'}
+          </span>
         </button>
 
         <button
@@ -221,7 +273,9 @@ export const AddRefuelingView: React.FC = () => {
           disabled={isAnalyzing || isSubmitting}
         >
           <Camera size={24} />
-          <span>{dashboardFile ? '✓ Licznik dodany' : 'Zdjęcie: Licznik'}</span>
+          <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {dashboardFile ? `✓ ${dashboardFile.name}` : 'Zdjęcie: Licznik'}
+          </span>
         </button>
       </div>
 
